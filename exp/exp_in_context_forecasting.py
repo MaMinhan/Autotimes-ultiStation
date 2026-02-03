@@ -78,8 +78,6 @@ class Exp_In_Context_Forecast(Exp_Basic):
         self.args.data = orig_data
         test_data2, test_loader2 = self._get_data(flag='test')
         
-        self.args.data = 'tsf_icl'
-        test_data3, test_loader3 = self._get_data(flag="test")
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
             os.makedirs(path)

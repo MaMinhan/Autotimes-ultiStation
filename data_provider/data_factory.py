@@ -29,12 +29,13 @@ def data_provider(args, flag):
         )
         return dataset, loader
     if args.data == "custom_ms":
-        pred_len = args.test_pred_len if flag == "test" else args.token_len
+        pred_len = args.test_pred_len
 
         dataset = Dataset_MultiStation_Custom(
             root_path=args.root_path,
             flag=flag,
             size=[args.seq_len, args.label_len, pred_len],
+            token_len=args.token_len,
             data_path=args.data_path,
             time_pt_path=args.time_pt_path,  # 你 argparse 里叫 time_pt_path
             freq_minutes=getattr(args, "freq_minutes", 15),

@@ -441,13 +441,15 @@ class Dataset_Preprocess(Dataset):
         )
 class Dataset_MultiStation_Custom(Dataset):
     """
-    Multi-station long-format dataset with a GLOBAL datetime axis.
+    原始数据是 long-format：每行是一条 (datetime, station, target, ...)。
 
-    - Build global unique datetime axis (sorted)
-    - Align each station to this axis (reindex)
-    - Build index_map: list of (sid_idx, s_begin_global_tidx)
-    - Split by time (global axis) to avoid leakage
-    - time_only.pt is shared across stations: slice by global time index
+    先构造全局唯一时间轴 dt（所有站点共有的、排序好的时间序列）。
+
+    每个站点的数据都 reindex 到 dt，这样每个站点都有长度一样的序列（缺失会被填）。
+
+    按全局时间轴切 train/val/test，避免同一时间点跨集合泄漏。
+
+    time_only.pt 也是按这个全局时间轴生成的，所以切片索引必须用全局 time index。
     """
     def __init__(
         self,
@@ -455,27 +457,38 @@ class Dataset_MultiStation_Custom(Dataset):
         flag="train",
         size=None,                 # [seq_len, label_len, pred_len_or_token_len]
         data_path="/root/autodl-tmp/datasets/SelfMadeAusgridData/merged_include_id_filled.csv",
-        time_pt_path=None,         # e.g. /root/.../time_only_20260129.pt
+        time_pt_path="/root/autodl-tmp/datasets/SelfMadeAusgridData/merged_include_id_filled.pt",         # e.g. /root/.../time_only_20260129.pt
         freq_minutes=15,
         scale=False,               # 先默认不做 scaler（multi-station + missing 更麻烦）
         train_ratio=0.7,
         val_ratio=0.1,
-        require_contiguous=False,  # True: 窗口内必须严格 15min 连续，否则跳过
+        require_contiguous=True,  # True: 窗口内必须严格 15min 连续，否则跳过
         fillna_value=None,         # None: keep NaN；或填 0 / 前向填充等（按你策略）
-        return_sid=False,          # True: __getitem__ 额外返回 sid_idx（需要同步改训练 loop）
+        return_sid=True,          # 如果需要站点级评估：用 sid_idx（return_sid=True）
         exog_cols=None,            # list[str] 外生变量列名（可选）
+        token_len=None
     ):
+
         assert size is not None, "size must be provided"
         assert flag in ["train", "val", "test"]
 
         self.root_path = root_path
         self.data_path = data_path
         self.flag = flag
-
+        """pred_len 决定 seq_y 的未来长度（label+pred）
+        token_len 决定 seq_x_mark/seq_y_mark 的采样步长
+        token_len 并不等于 pred_len，而是固定等于 seq_len - label_len"""
         self.seq_len, self.label_len, self.pred_len = size
+        #print("[DEBUG] seq_len,label_len,pred_len =", self.seq_len, self.label_len, self.pred_len)
+
         # AutoTimes 里 token_len 通常 = pred_len(训练时) 或你传入的 token_len
         # 这里为了和你 Step B 描述一致，token_len 用 args.token_len（训练时 size[2] 就是 token_len）
-        self.token_len = self.seq_len - self.label_len
+        if token_len is None:
+            # 兜底：如果没传，就用原先那套（保持兼容）
+            self.token_len = self.seq_len - self.label_len
+        else:
+            self.token_len = int(token_len)
+        #print("[DEBUG] token_len(mark stride)     =", self.token_len)
         self.freq_minutes = int(freq_minutes)
 
         self.train_ratio = float(train_ratio)
@@ -489,7 +502,7 @@ class Dataset_MultiStation_Custom(Dataset):
 
         self.exog_cols = exog_cols or []
 
-        # time_only.pt：shape [T_unique, d]
+        # 期望 shape [T_unique, d]
         if time_pt_path is None:
             raise ValueError("time_pt_path must be set to your shared time_only.pt")
         self.time_pt = torch.load(time_pt_path, map_location="cpu")  # [T, d]
@@ -497,7 +510,7 @@ class Dataset_MultiStation_Custom(Dataset):
         self.__read_data__()
         self.__build_index_map__()
 
-    def __read_data__(self):
+    def __read_data__(self):#把 CSV long 表 → 对齐成 [N_station, T, ...]
         fp = os.path.join(self.root_path, self.data_path)
         usecols = ["datetime", "station", "target"] + list(self.exog_cols)
         df = pd.read_csv(fp, usecols=usecols)
@@ -516,6 +529,7 @@ class Dataset_MultiStation_Custom(Dataset):
         self.T = len(self.dt)
 
         # 校验 time_only.pt 长度一致
+        # time_only.pt 的第 t 行 embedding 对应 dt 的第 t 个时间点。
         if self.time_pt.shape[0] != self.T:
             raise ValueError(
                 f"time_only.pt length mismatch: time_pt={self.time_pt.shape[0]} vs dt={self.T}. "
@@ -549,12 +563,13 @@ class Dataset_MultiStation_Custom(Dataset):
 
             # reindex 到全局 dt
             sdf = sdf.reindex(dt_index)
+            # 对 target 插值补全
             s = sdf["target"].astype("float32")
             s = s.interpolate(limit_direction="both")
             s = s.ffill().bfill()
             sdf["target"] = s
             Y[sid_idx, :] = sdf["target"].to_numpy(dtype=np.float32)
-
+            #这里假设外生变量也是按站点随时间变化的（比如气温），如果是站点静态属性（人口密度），时间填充成常数序列是 OK 的。
             if exog_dim > 0:
                 for j, c in enumerate(self.exog_cols):
                     ss = sdf[c].astype("float32")
@@ -564,7 +579,7 @@ class Dataset_MultiStation_Custom(Dataset):
                     X_exog[sid_idx, :, j] = ss.to_numpy(dtype=np.float32)
 
 
-        # 缺失处理（按你策略来）
+        # 若指定 fillna_value，把剩余 NaN 填成固定值
         if self.fillna_value is not None:
             Y = np.nan_to_num(Y, nan=float(self.fillna_value))
             if X_exog is not None:
@@ -591,7 +606,7 @@ class Dataset_MultiStation_Custom(Dataset):
             # 记录下来，后续如果你要反归一化/画图会用到
             self.y_mu = mu.astype(np.float32)
             self.y_sd = sd.astype(np.float32)
-        self.X_exog = X_exog    # [N, T, exog_dim] or None
+        self.X_exog = X_exog    # [N, T, exog_dim] or None  目前只是存着，__getitem__ 里没返回
 
 
         border1s = [0, num_train, num_train + num_val]
@@ -655,11 +670,13 @@ class Dataset_MultiStation_Custom(Dataset):
         s_end = s_begin + self.seq_len
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
-
+        #其中前 label_len 是 decoder 输入标签段（teacher forcing）
+        #后 pred_len 是预测段（训练 loss 的主要部分）
         # target
         seq_x = self.Y[sid_idx, s_begin:s_end, :]       # [seq_len, 1]
         seq_y = self.Y[sid_idx, r_begin:r_end, :]       # [label_len+pred_len, 1]
 
+    
         # time marks: 按 token_len 步长取（和原 AutoTimes 数据集一致用法）
         seq_x_mark = self.time_pt[s_begin:s_end:self.token_len]  # [token_num, d]
         seq_y_mark = self.time_pt[s_end:r_end:self.token_len]    # [token_num2, d]
