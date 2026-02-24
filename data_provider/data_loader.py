@@ -462,7 +462,7 @@ class Dataset_MultiStation_Custom(Dataset):
         scale=False,               # 先默认不做 scaler（multi-station + missing 更麻烦）
         train_ratio=0.7,
         val_ratio=0.1,
-        require_contiguous=True,  # True: 窗口内必须严格 15min 连续，否则跳过
+        require_contiguous=False,  # True: 窗口内必须严格 15min 连续，否则跳过
         fillna_value=None,         # None: keep NaN；或填 0 / 前向填充等（按你策略）
         return_sid=True,          # 如果需要站点级评估：用 sid_idx（return_sid=True）
         exog_cols=None,            # list[str] 外生变量列名（可选）
@@ -480,7 +480,6 @@ class Dataset_MultiStation_Custom(Dataset):
         token_len 并不等于 pred_len，而是固定等于 seq_len - label_len"""
         self.seq_len, self.label_len, self.pred_len = size
         #print("[DEBUG] seq_len,label_len,pred_len =", self.seq_len, self.label_len, self.pred_len)
-
         # AutoTimes 里 token_len 通常 = pred_len(训练时) 或你传入的 token_len
         # 这里为了和你 Step B 描述一致，token_len 用 args.token_len（训练时 size[2] 就是 token_len）
         if token_len is None:
@@ -686,7 +685,7 @@ class Dataset_MultiStation_Custom(Dataset):
 
         # 可选外生变量：你后续要融合时可以在这里拼到 seq_x/seq_y 或另外返回
         # 目前为了不改训练 loop（exp 里默认解包 4 个返回值），先不返回 exog。
-        # if self.X_exog is not None:
+        #if self.X_exog is not None:
         #     exog_x = self.X_exog[sid_idx, s_begin:s_end, :]  # [seq_len, exog_dim]
 
         if self.return_sid:
