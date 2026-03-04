@@ -457,7 +457,8 @@ class Dataset_MultiStation_Custom(Dataset):
         flag="train",
         size=None,                 # [seq_len, label_len, pred_len_or_token_len]
         data_path="/root/autodl-tmp/datasets/SelfMadeAusgridData/merged_include_id_filled.csv",
-        time_pt_path="/root/autodl-tmp/datasets/SelfMadeAusgridData/merged_include_id_filled.pt",         # e.g. /root/.../time_only_20260129.pt
+        time_pt_path="/root/autodl-tmp/datasets/SelfMadeAusgridData/merged_include_id_filled_by_GPT2.pt",         # e.g. /root/.../time_only_20260129.pt
+        weather_pt_path='/root/autodl-tmp/datasets/SelfMadeAusgridData/weather_numbers_by_GPT2.pt',
         freq_minutes=15,
         scale=False,               # 先默认不做 scaler（multi-station + missing 更麻烦）
         train_ratio=0.7,
@@ -505,7 +506,7 @@ class Dataset_MultiStation_Custom(Dataset):
         if time_pt_path is None:
             raise ValueError("time_pt_path must be set to your shared time_only.pt")
         self.time_pt = torch.load(time_pt_path, map_location="cpu")  # [T, d]
-
+        self.weather_pt = torch.load(weather_pt_path, map_location="cpu")
         self.__read_data__()
         self.__build_index_map__()
 
@@ -538,7 +539,7 @@ class Dataset_MultiStation_Custom(Dataset):
         # station 列表
         self.stations = sorted(df["station"].unique().tolist())
         self.sid2idx = {s: i for i, s in enumerate(self.stations)}
-
+        
         # 把每个 station reindex 到全局时间轴
         # 目标：self.Y shape [N_station, T, 1]
         N = len(self.stations)
@@ -628,6 +629,11 @@ class Dataset_MultiStation_Custom(Dataset):
         else:
             self.break_prefix = None
 
+        print(f"[WEATHER] weather_pt loaded: {self.weather_pt is not None}", flush=True)
+        if self.weather_pt is not None:
+            print(f"[WEATHER] weather_pt shape={tuple(self.weather_pt.shape)} dtype={self.weather_pt.dtype}", flush=True)
+            print(f"[WEATHER] N(stations)={len(self.stations)} T(dt)={self.T}", flush=True)
+
     def __window_has_break(self, l, r):
         """
         判断 (l, r] 区间内是否存在 breaks（即 l+1..r 有断点）
@@ -688,8 +694,15 @@ class Dataset_MultiStation_Custom(Dataset):
         #if self.X_exog is not None:
         #     exog_x = self.X_exog[sid_idx, s_begin:s_end, :]  # [seq_len, exog_dim]
 
+        w_x_mark = self.weather_pt[sid_idx, s_begin:s_end:self.token_len, :]
+        w_y_mark = self.weather_pt[sid_idx, s_end:r_end:self.token_len, :]
+
+        seq_x_mark = torch.cat([seq_x_mark, w_x_mark], dim=-1)
+        seq_y_mark = torch.cat([seq_y_mark, w_y_mark], dim=-1)
         if self.return_sid:
             return seq_x, seq_y, seq_x_mark, seq_y_mark, sid_idx
         assert seq_x_mark.std() > 0, "time.pt loaded but seq_x_mark is zero!"
-
+        if not hasattr(self, "_dbg_markdim_once"):
+            self._dbg_markdim_once = True
+            print("[MARK DIM]", seq_x_mark.shape[-1], flush=True)
         return seq_x, seq_y, seq_x_mark, seq_y_mark

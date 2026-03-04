@@ -182,21 +182,36 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                 chk("loss", loss)
 
-                # ③ 最强 sanity：mark 是否影响输出
                 if do_sanity:
-                    zeros_xm = torch.zeros_like(batch_x_mark)
-                    zeros_ym = torch.zeros_like(batch_y_mark)
+                    D = batch_x_mark.shape[-1]
+                    half = D // 2  # 1536->768
                     with torch.no_grad():
-                        if self.args.use_amp:
-                            with torch.cuda.amp.autocast():
-                                outputs0 = self.model(batch_x, zeros_xm, None, zeros_ym)
-                        else:
-                            outputs0 = self.model(batch_x, zeros_xm, None, zeros_ym)
-                    diff = (outputs - outputs0).abs().mean().item()
-                    print("[SANITY] mean(|outputs(mark)-outputs(zero_mark)|) =", diff)
-                    if diff < 1e-8:
-                        print("[WARN] outputs unchanged when mark is zero -> mark not used by model or mark is constant.")
+                        # 0) full
+                        out_full = outputs
 
+                        # 1) zero all mark
+                        zeros_xm = torch.zeros_like(batch_x_mark)
+                        zeros_ym = torch.zeros_like(batch_y_mark)
+                        out_zero = self.model(batch_x, zeros_xm, None, zeros_ym)
+
+                        # 2) time-only: keep first half, zero second half (weather)
+                        xm_time = batch_x_mark.clone()
+                        ym_time = batch_y_mark.clone()
+                        xm_time[..., half:] = 0
+                        ym_time[..., half:] = 0
+                        out_time = self.model(batch_x, xm_time, None, ym_time)
+
+                        # 3) weather-only: keep second half, zero first half (time)
+                        xm_w = batch_x_mark.clone()
+                        ym_w = batch_y_mark.clone()
+                        xm_w[..., :half] = 0
+                        ym_w[..., :half] = 0
+                        out_w = self.model(batch_x, xm_w, None, ym_w)
+
+                    print("[SANITY] full-vs-zero =", (out_full - out_zero).abs().mean().item())
+                    print("[SANITY] full-vs-time =", (out_full - out_time).abs().mean().item(), "  <-- weather contribution")
+                    print("[SANITY] full-vs-wthr =", (out_full - out_w).abs().mean().item(), "  <-- time contribution")
+                
                 loss_val += loss.item()
                 count += 1
 

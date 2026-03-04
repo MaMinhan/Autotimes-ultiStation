@@ -54,7 +54,7 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
     # 你自定义 multi-station/时间embedding 使用的 time_only.pt 路径（全局时间轴embedding）
     parser.add_argument('--time_pt_path', type=str,
                         default='/root/autodl-tmp/datasets/electricity_pt/time_only_20260129.pt')
-
+    parser.add_argument('--weather_pt_path', type=str, default='')
     # npy 路线相关路径：仅当 args.data == "npy" 时会用到
     parser.add_argument('--npy_x_path', type=str, default='')
     parser.add_argument('--npy_y_path', type=str, default='')
@@ -203,6 +203,8 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                 args.cosine,            # 是否cosine调度
                 args.mix_embeds,        # 是否mix embedding
                 args.des,               # 你填的描述
+                args.ms_scale,           # multi-station是否按站点scale
+                args.train_epochs,              # epoch数（有时也写在setting里）
                 ii                      # 第几次重复实验
             )
 

@@ -37,7 +37,8 @@ def data_provider(args, flag):
             size=[args.seq_len, args.label_len, pred_len],
             token_len=args.token_len,
             data_path=args.data_path,
-            time_pt_path=args.time_pt_path,  # 你 argparse 里叫 time_pt_path
+            weather_pt_path=args.weather_pt_path,
+            time_pt_path=args.time_pt_path,  
             freq_minutes=getattr(args, "freq_minutes", 15),
             
             # split（可先用默认）
