@@ -30,7 +30,15 @@ def data_provider(args, flag):
         return dataset, loader
     if args.data == "custom_ms":
         pred_len = args.test_pred_len
-
+        if flag == "train":
+            print(f"[DATA_FACTORY] flag={flag}, seq_len={args.seq_len}, label_len={args.label_len}, "
+                f"token_len={args.token_len}, pred_len(test_pred_len)={pred_len}")
+        elif flag == "val":
+            print(f"[DATA_FACTORY] flag={flag}, seq_len={args.seq_len}, label_len={args.label_len}, "
+                f"token_len={args.token_len}, pred_len(test_pred_len)={pred_len}")
+        elif flag == "test":
+            print(f"[DATA_FACTORY] flag={flag}, seq_len={args.seq_len}, label_len={args.label_len}, "
+                f"token_len={args.token_len}, pred_len(test_pred_len)={pred_len}")
         dataset = Dataset_MultiStation_Custom(
             root_path=args.root_path,
             flag=flag,

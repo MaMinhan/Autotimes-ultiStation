@@ -142,10 +142,13 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                         help='是否启用多GPU（DDP）')
     parser.add_argument('--visualize', action='store_true', default=False,
                         help='可视化开关（run.py里没用，可能Exp里用）')
-
+    parser.add_argument('--resume', action='store_true', default=False,
+                    help='是否从已有checkpoint加载后继续训练')
+    parser.add_argument('--resume_ckpt', type=str, default='',
+                        help='要继续训练的checkpoint完整路径')
     # 解析命令行参数：把 --xxx 转成 args.xxx
     args = parser.parse_args()
-
+    
     # ========== 3) 多卡DDP初始化（只有 --use_multi_gpu 时才执行） ==========
     if args.use_multi_gpu:
         ip = os.environ.get("MASTER_ADDR", "127.0.0.1")   # 主节点IP（torchrun会设）
@@ -180,7 +183,6 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
         Exp = Exp_In_Context_Forecast
     else:
         Exp = Exp_Long_Term_Forecast  # 默认兜底
-
     # ========== 5) 训练模式：训练+测试 ==========
     if args.is_training:
         for ii in range(args.itr):  # 重复实验itr次（便于跑多个seed/配置）

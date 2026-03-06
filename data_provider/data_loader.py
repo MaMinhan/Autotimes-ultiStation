@@ -528,14 +528,22 @@ class Dataset_MultiStation_Custom(Dataset):
         )
         self.T = len(self.dt)
 
-        # 校验 time_only.pt 长度一致
-        # time_only.pt 的第 t 行 embedding 对应 dt 的第 t 个时间点。
-        if self.time_pt.shape[0] != self.T:
-            raise ValueError(
-                f"time_only.pt length mismatch: time_pt={self.time_pt.shape[0]} vs dt={self.T}. "
-                "请确认 time_only.pt 是用同一份 merged_clean.csv 的 unique datetime 生成的。"
-            )
-
+        # 支持 [T, D] 或 [N, T, D]
+        if self.time_pt.dim() == 2:
+            if self.time_pt.shape[0] != self.T:
+                raise ValueError(
+                    f"time.pt length mismatch: time_pt={self.time_pt.shape[0]} vs dt={self.T}"
+                )
+        elif self.time_pt.dim() == 3:
+            # 约定格式 [N, T, D]
+            if self.time_pt.shape[1] != self.T:
+                raise ValueError(
+                    f"time.pt length mismatch: time_pt.shape[1]={self.time_pt.shape[1]} vs dt={self.T}"
+                )
+        else:
+            raise ValueError(f"Unsupported time.pt dim = {self.time_pt.dim()}, expected 2 or 3")
+        print("[TIME_PT] loaded shape:", self.time_pt.shape)
+        print("[TIME_PT] dim:", self.time_pt.dim())
         # station 列表
         self.stations = sorted(df["station"].unique().tolist())
         self.sid2idx = {s: i for i, s in enumerate(self.stations)}
@@ -681,10 +689,21 @@ class Dataset_MultiStation_Custom(Dataset):
         seq_x = self.Y[sid_idx, s_begin:s_end, :]       # [seq_len, 1]
         seq_y = self.Y[sid_idx, r_begin:r_end, :]       # [label_len+pred_len, 1]
 
-    
+        if i == 0:
+            print("[GETITEM] sid_idx =", sid_idx)
+            print("[GETITEM] seq_x_mark.shape =", seq_x_mark.shape)
+            print("[GETITEM] seq_y_mark.shape =", seq_y_mark.shape)
         # time marks: 按 token_len 步长取（和原 AutoTimes 数据集一致用法）
-        seq_x_mark = self.time_pt[s_begin:s_end:self.token_len]  # [token_num, d]
-        seq_y_mark = self.time_pt[s_end:r_end:self.token_len]    # [token_num2, d]
+        if self.time_pt.dim() == 2:
+            # 老格式: [T, D]
+            seq_x_mark = self.time_pt[s_begin:s_end:self.token_len]   # [token_num, D]
+            seq_y_mark = self.time_pt[s_end:r_end:self.token_len]     # [token_num2, D]
+        elif self.time_pt.dim() == 3:
+            # 新格式: [N, T, D]
+            seq_x_mark = self.time_pt[sid_idx, s_begin:s_end:self.token_len, :]   # [token_num, D]
+            seq_y_mark = self.time_pt[sid_idx, s_end:r_end:self.token_len, :]     # [token_num2, D]
+        else:
+            raise ValueError(f"Unsupported time.pt dim = {self.time_pt.dim()}")
 
         #seq_x_mark = torch.zeros_like(self.time_pt[s_begin:s_end:self.token_len])
         #seq_y_mark = torch.zeros_like(self.time_pt[s_end:r_end:self.token_len])

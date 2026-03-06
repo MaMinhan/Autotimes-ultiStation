@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
-
+from torch.utils.tensorboard import SummaryWriter
 warnings.filterwarnings('ignore')
 
 
@@ -115,8 +115,26 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
+        if getattr(self.args, "resume", False):
+            if not self.args.resume_ckpt:
+                raise ValueError("resume=True 但没有提供 --resume_ckpt")
+            print(f"[RESUME] loading checkpoint from {self.args.resume_ckpt}")
+            load_item = torch.load(self.args.resume_ckpt, map_location=self.device)
 
+            # 兼容 DDP / 非DDP
+            if isinstance(load_item, dict):
+                try:
+                    self.model.load_state_dict(load_item, strict=False)
+                except RuntimeError:
+                    self.model.load_state_dict(
+                        {k.replace('module.', ''): v for k, v in load_item.items()},
+                        strict=False
+                    )
+            else:
+                raise ValueError("checkpoint 格式异常")
         path = os.path.join(self.args.checkpoints, setting)
+        log_dir = os.path.join(path, "tensorboard")
+        writer = SummaryWriter(log_dir)
         if (self.args.use_multi_gpu and self.args.local_rank == 0) or not self.args.use_multi_gpu:
             if not os.path.exists(path):
                 os.makedirs(path)
@@ -245,6 +263,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             if (self.args.use_multi_gpu and self.args.local_rank == 0) or not self.args.use_multi_gpu:
                 print("Epoch: {}, Steps: {} | Train Loss: {:.7f} Vali Loss: {:.7f} Test Loss: {:.7f}".format(
                     epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+                writer.add_scalar("loss/train", train_loss, epoch)
+                writer.add_scalar("loss/vali", vali_loss, epoch)
+                writer.add_scalar("loss/test", test_loss, epoch)
+                writer.add_scalar("lr", model_optim.param_groups[0]['lr'], epoch)
             early_stopping(vali_loss, self.model, path)
             if early_stopping.early_stop:
                 if (self.args.use_multi_gpu and self.args.local_rank == 0) or not self.args.use_multi_gpu:
@@ -258,7 +280,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 adjust_learning_rate(model_optim, epoch + 1, self.args)
             if self.args.use_multi_gpu:
                 train_loader.sampler.set_epoch(epoch + 1)
-                
+        writer.close()
         best_model_path = path + '/' + 'checkpoint.pth'
         if self.args.use_multi_gpu:
             dist.barrier()
@@ -296,54 +318,49 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y = batch_y.float().to(self.device)
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
-
+                if i == 0:
+                    print(f"[TEST] batch_x.shape={batch_x.shape}")
+                    print(f"[TEST] batch_y.shape={batch_y.shape}")
+                    print(f"[TEST] batch_x_mark.shape={batch_x_mark.shape}")
+                    print(f"[TEST] batch_y_mark.shape={batch_y_mark.shape}")
+                    print(f"[TEST] token_len={self.args.token_len}, test_pred_len={self.args.test_pred_len}")
                 inference_steps = self.args.test_pred_len // self.args.token_len
                 dis = self.args.test_pred_len - inference_steps * self.args.token_len
                 if dis != 0:
                     inference_steps += 1
+                if i == 0:
+                    print(f"[TEST] inference_steps={inference_steps}, dis={dis}")
                 pred_y = []
                 for j in range(inference_steps):
                     if len(pred_y) != 0:
                         batch_x = torch.cat([batch_x[:, self.args.token_len:, :], pred_y[-1]], dim=1)
                         tmp = batch_y_mark[:, j-1:j, :]
                         batch_x_mark = torch.cat([batch_x_mark[:, 1:, :], tmp], dim=1)
-                        
                     if self.args.use_amp:
                         with torch.cuda.amp.autocast():
                             outputs = self.model(batch_x, batch_x_mark, None, batch_y_mark)
                     else:
                         outputs = self.model(batch_x, batch_x_mark, None, batch_y_mark)
-                    pred_y.append(outputs[:, -self.args.token_len:, :])
+                    step_pred = outputs[:, -self.args.token_len:, :]
+                    pred_y.append(step_pred)
+                    if i == 0:
+                        print(f"[TEST] step={j}, step_pred.shape={step_pred.shape}")
                 pred_y = torch.cat(pred_y, dim=1)
+                if i == 0:
+                    print(f"[TEST] pred_y before trim={pred_y.shape}")
                 if dis != 0:
                     pred_y = pred_y[:, :-(self.args.token_len - dis), :]
+                if i == 0:
+                    print(f"[TEST] pred_y after trim={pred_y.shape}")
                 batch_y = batch_y[:, -self.args.test_pred_len:, :].to(self.device)
+                if i == 0:
+                    print(f"[TEST] aligned batch_y={batch_y.shape}")
                 outputs = pred_y.detach().cpu()
                 batch_y = batch_y.detach().cpu()
-
                 pred = outputs
                 true = batch_y
-
-                preds.append(pred)
-                trues.append(true)
-                if (i + 1) % 100 == 0:
-                    if (self.args.use_multi_gpu and self.args.local_rank == 0) or not self.args.use_multi_gpu:
-                        speed = (time.time() - time_now) / iter_count
-                        left_time = speed * (test_steps - i)
-                        print("\titers: {}, speed: {:.4f}s/iter, left time: {:.4f}s".format(i + 1, speed, left_time))
-                        iter_count = 0
-                        time_now = time.time()
-                    
-                if self.args.visualize and i == 0:
-                    gt = np.array(true[0, :, -1])
-                    pd = np.array(pred[0, :, -1])
-                    lookback = batch_x[0, :, -1].detach().cpu().numpy()
-                    gt = np.concatenate([lookback, gt], axis=0)
-                    pd = np.concatenate([lookback, pd], axis=0)
-                    dir_path = folder_path + f'{self.args.test_pred_len}/'
-                    if not os.path.exists(dir_path):
-                        os.makedirs(dir_path)
-                    visual(gt, pd, os.path.join(dir_path, f'{i}.png'))
+                if i == 0:
+                    print(f"[TEST] final pred.shape={pred.shape}, true.shape={true.shape}")
         
         preds = torch.cat(preds, dim=0).numpy()
         trues = torch.cat(trues, dim=0).numpy()
