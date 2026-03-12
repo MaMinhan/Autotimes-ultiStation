@@ -458,7 +458,7 @@ class Dataset_MultiStation_Custom(Dataset):
         size=None,                 # [seq_len, label_len, pred_len_or_token_len]
         data_path="/root/autodl-tmp/datasets/SelfMadeAusgridData/merged_include_id_filled.csv",
         time_pt_path="/root/autodl-tmp/datasets/SelfMadeAusgridData/merged_include_id_filled_by_GPT2.pt",         # e.g. /root/.../time_only_20260129.pt
-        weather_pt_path='/root/autodl-tmp/datasets/SelfMadeAusgridData/weather_numbers_by_GPT2.pt',
+        weather_pt_path='',
         freq_minutes=15,
         scale=False,               # 先默认不做 scaler（multi-station + missing 更麻烦）
         train_ratio=0.7,
@@ -506,7 +506,17 @@ class Dataset_MultiStation_Custom(Dataset):
         if time_pt_path is None:
             raise ValueError("time_pt_path must be set to your shared time_only.pt")
         self.time_pt = torch.load(time_pt_path, map_location="cpu")  # [T, d]
-        self.weather_pt = torch.load(weather_pt_path, map_location="cpu")
+
+        self.weather_pt_path = weather_pt_path
+        self.use_weather = bool(weather_pt_path)
+
+        if self.use_weather:
+            self.weather_pt = torch.load(weather_pt_path, map_location="cpu")
+            print("[WEATHER_PT] loaded shape:", self.weather_pt.shape)
+        else:
+            self.weather_pt = None
+            print("[WEATHER_PT] not provided, use time_pt only")
+
         self.__read_data__()
         self.__build_index_map__()
 
@@ -683,11 +693,9 @@ class Dataset_MultiStation_Custom(Dataset):
         s_end = s_begin + self.seq_len
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
-
         # target
         seq_x = self.Y[sid_idx, s_begin:s_end, :]   # [seq_len, 1]
         seq_y = self.Y[sid_idx, r_begin:r_end, :]   # [label_len+pred_len, 1]
-
         # time marks
         if self.time_pt.dim() == 2:
             # 老格式: [T, D]
@@ -699,15 +707,13 @@ class Dataset_MultiStation_Custom(Dataset):
             seq_y_mark = self.time_pt[sid_idx, s_end:r_end:self.token_len, :]     # [token_num2, D]
         else:
             raise ValueError(f"Unsupported time.pt dim = {self.time_pt.dim()}")
-
-        # weather marks
-        w_x_mark = self.weather_pt[sid_idx, s_begin:s_end:self.token_len, :]
-        w_y_mark = self.weather_pt[sid_idx, s_end:r_end:self.token_len, :]
-
-        # concat time + weather
-        seq_x_mark = torch.cat([seq_x_mark, w_x_mark], dim=-1)
-        seq_y_mark = torch.cat([seq_y_mark, w_y_mark], dim=-1)
-
+        # weather marks（可选）
+        if self.weather_pt is not None:
+            w_x_mark = self.weather_pt[sid_idx, s_begin:s_end:self.token_len, :]
+            w_y_mark = self.weather_pt[sid_idx, s_end:r_end:self.token_len, :]
+            # concat time + weather
+            seq_x_mark = torch.cat([seq_x_mark, w_x_mark], dim=-1)
+            seq_y_mark = torch.cat([seq_y_mark, w_y_mark], dim=-1)
         # # debug print：一定要放到定义之后
         # if i == 0:
         #     print("[GETITEM] sid_idx =", sid_idx)
@@ -715,16 +721,13 @@ class Dataset_MultiStation_Custom(Dataset):
         #     print("[GETITEM] seq_y.shape =", seq_y.shape)
         #     print("[GETITEM] seq_x_mark.shape =", seq_x_mark.shape)
         #     print("[GETITEM] seq_y_mark.shape =", seq_y_mark.shape)
-        #     print("[GETITEM] w_x_mark.shape =", w_x_mark.shape)
-        #     print("[GETITEM] w_y_mark.shape =", w_y_mark.shape)
-
+        #     if self.weather_pt is not None:
+        #         print("[GETITEM] w_x_mark.shape =", w_x_mark.shape)
+        #         print("[GETITEM] w_y_mark.shape =", w_y_mark.shape)
         if self.return_sid:
             return seq_x, seq_y, seq_x_mark, seq_y_mark, sid_idx
-
         assert seq_x_mark.std() > 0, "time.pt loaded but seq_x_mark is zero!"
-
         if not hasattr(self, "_dbg_markdim_once"):
             self._dbg_markdim_once = True
             print("[MARK DIM]", seq_x_mark.shape[-1], flush=True)
-
         return seq_x, seq_y, seq_x_mark, seq_y_mark
