@@ -304,69 +304,99 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         preds = []
         trues = []
+
         folder_path = './test_results/' + setting + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
+
         time_now = time.time()
         test_steps = len(test_loader)
         iter_count = 0
+
         self.model.eval()
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
                 iter_count += 1
+
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
+
                 if i == 0:
                     print(f"[TEST] batch_x.shape={batch_x.shape}")
                     print(f"[TEST] batch_y.shape={batch_y.shape}")
                     print(f"[TEST] batch_x_mark.shape={batch_x_mark.shape}")
                     print(f"[TEST] batch_y_mark.shape={batch_y_mark.shape}")
                     print(f"[TEST] token_len={self.args.token_len}, test_pred_len={self.args.test_pred_len}")
+
                 inference_steps = self.args.test_pred_len // self.args.token_len
                 dis = self.args.test_pred_len - inference_steps * self.args.token_len
                 if dis != 0:
                     inference_steps += 1
+
                 if i == 0:
                     print(f"[TEST] inference_steps={inference_steps}, dis={dis}")
+
                 pred_y = []
                 for j in range(inference_steps):
                     if len(pred_y) != 0:
                         batch_x = torch.cat([batch_x[:, self.args.token_len:, :], pred_y[-1]], dim=1)
                         tmp = batch_y_mark[:, j-1:j, :]
                         batch_x_mark = torch.cat([batch_x_mark[:, 1:, :], tmp], dim=1)
+
                     if self.args.use_amp:
                         with torch.cuda.amp.autocast():
                             outputs = self.model(batch_x, batch_x_mark, None, batch_y_mark)
                     else:
                         outputs = self.model(batch_x, batch_x_mark, None, batch_y_mark)
+
                     step_pred = outputs[:, -self.args.token_len:, :]
                     pred_y.append(step_pred)
+
                     if i == 0:
                         print(f"[TEST] step={j}, step_pred.shape={step_pred.shape}")
+
                 pred_y = torch.cat(pred_y, dim=1)
+
                 if i == 0:
                     print(f"[TEST] pred_y before trim={pred_y.shape}")
+
                 if dis != 0:
                     pred_y = pred_y[:, :-(self.args.token_len - dis), :]
+
                 if i == 0:
                     print(f"[TEST] pred_y after trim={pred_y.shape}")
+
                 batch_y = batch_y[:, -self.args.test_pred_len:, :].to(self.device)
+
                 if i == 0:
                     print(f"[TEST] aligned batch_y={batch_y.shape}")
+
                 outputs = pred_y.detach().cpu()
                 batch_y = batch_y.detach().cpu()
+
                 pred = outputs
                 true = batch_y
+
                 if i == 0:
                     print(f"[TEST] final pred.shape={pred.shape}, true.shape={true.shape}")
-        
+
+                # 关键：一定要 append
+                preds.append(pred)
+                trues.append(true)
+
+        if len(preds) == 0:
+            raise ValueError("preds is empty in test()")
+        if len(trues) == 0:
+            raise ValueError("trues is empty in test()")
+
         preds = torch.cat(preds, dim=0).numpy()
         trues = torch.cat(trues, dim=0).numpy()
-        
+
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('mse:{}, mae:{}'.format(mse, mae))
+
         f = open("result_long_term_forecast.txt", 'a')
         f.write(setting + "  \n")
         f.write('mse:{}, mae:{}'.format(mse, mae))

@@ -683,17 +683,12 @@ class Dataset_MultiStation_Custom(Dataset):
         s_end = s_begin + self.seq_len
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
-        #其中前 label_len 是 decoder 输入标签段（teacher forcing）
-        #后 pred_len 是预测段（训练 loss 的主要部分）
-        # target
-        seq_x = self.Y[sid_idx, s_begin:s_end, :]       # [seq_len, 1]
-        seq_y = self.Y[sid_idx, r_begin:r_end, :]       # [label_len+pred_len, 1]
 
-        if i == 0:
-            print("[GETITEM] sid_idx =", sid_idx)
-            print("[GETITEM] seq_x_mark.shape =", seq_x_mark.shape)
-            print("[GETITEM] seq_y_mark.shape =", seq_y_mark.shape)
-        # time marks: 按 token_len 步长取（和原 AutoTimes 数据集一致用法）
+        # target
+        seq_x = self.Y[sid_idx, s_begin:s_end, :]   # [seq_len, 1]
+        seq_y = self.Y[sid_idx, r_begin:r_end, :]   # [label_len+pred_len, 1]
+
+        # time marks
         if self.time_pt.dim() == 2:
             # 老格式: [T, D]
             seq_x_mark = self.time_pt[s_begin:s_end:self.token_len]   # [token_num, D]
@@ -705,23 +700,31 @@ class Dataset_MultiStation_Custom(Dataset):
         else:
             raise ValueError(f"Unsupported time.pt dim = {self.time_pt.dim()}")
 
-        #seq_x_mark = torch.zeros_like(self.time_pt[s_begin:s_end:self.token_len])
-        #seq_y_mark = torch.zeros_like(self.time_pt[s_end:r_end:self.token_len])
-
-        # 可选外生变量：你后续要融合时可以在这里拼到 seq_x/seq_y 或另外返回
-        # 目前为了不改训练 loop（exp 里默认解包 4 个返回值），先不返回 exog。
-        #if self.X_exog is not None:
-        #     exog_x = self.X_exog[sid_idx, s_begin:s_end, :]  # [seq_len, exog_dim]
-
+        # weather marks
         w_x_mark = self.weather_pt[sid_idx, s_begin:s_end:self.token_len, :]
         w_y_mark = self.weather_pt[sid_idx, s_end:r_end:self.token_len, :]
 
+        # concat time + weather
         seq_x_mark = torch.cat([seq_x_mark, w_x_mark], dim=-1)
         seq_y_mark = torch.cat([seq_y_mark, w_y_mark], dim=-1)
+
+        # # debug print：一定要放到定义之后
+        # if i == 0:
+        #     print("[GETITEM] sid_idx =", sid_idx)
+        #     print("[GETITEM] seq_x.shape =", seq_x.shape)
+        #     print("[GETITEM] seq_y.shape =", seq_y.shape)
+        #     print("[GETITEM] seq_x_mark.shape =", seq_x_mark.shape)
+        #     print("[GETITEM] seq_y_mark.shape =", seq_y_mark.shape)
+        #     print("[GETITEM] w_x_mark.shape =", w_x_mark.shape)
+        #     print("[GETITEM] w_y_mark.shape =", w_y_mark.shape)
+
         if self.return_sid:
             return seq_x, seq_y, seq_x_mark, seq_y_mark, sid_idx
+
         assert seq_x_mark.std() > 0, "time.pt loaded but seq_x_mark is zero!"
+
         if not hasattr(self, "_dbg_markdim_once"):
             self._dbg_markdim_once = True
             print("[MARK DIM]", seq_x_mark.shape[-1], flush=True)
+
         return seq_x, seq_y, seq_x_mark, seq_y_mark

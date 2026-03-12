@@ -2,8 +2,8 @@ import pandas as pd
 
 # ====== 路径 ======
 station_map_path = "/root/autodl-tmp/datasets/SelfMadeAusgridData/station_map.csv"      # 站点映射表
-weather_path = "/root/autodl-tmp/datasets/SelfMadeAusgridData/station_weather_daily_2024.csv"               # 原始天气数据
-output_path = "/root/autodl-tmp/datasets/SelfMadeAusgridData/weather_with_station_id.csv"
+weather_path = "/root/autodl-tmp/datasets/SelfMadeAusgridData/station_weather_daily_2023.csv"               # 原始天气数据
+output_path = "/root/autodl-tmp/datasets/SelfMadeAusgridData/weather_with_station_id_2023.csv"
 
 df_map = pd.read_csv(station_map_path)
 df_weather = pd.read_csv(weather_path)

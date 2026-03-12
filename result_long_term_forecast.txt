@@ -37,3 +37,6 @@ mse:1.2847683429718018, mae:0.8327128887176514
 long_term_forecast—weather_numbers_ms_ausgrid_tl96_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl24_lr0.0001_bt32_wd0_hd256_hl2_cosFalse_mixFalse_tl96_0  
 mse:1.3183029890060425, mae:0.8441463112831116
 
+long_term_forecast—only_temperature_0306_ms_ausgrid_tl96_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl24_lr0.0001_bt32_wd0_hd256_hl2_cosFalse_mixFalse_test_1  
+mse:30.292770385742188, mae:3.4301509857177734
+
