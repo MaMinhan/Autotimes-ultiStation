@@ -1,0 +1,262 @@
+Script started on 2026-03-06 22:45:20+08:00 [TERM="screen" TTY="/dev/pts/2" COLUMNS="149" LINES="29"]
++-----------------------------------------------AutoDL-----------------------------------------------------+
+[32m目录说明:[0m
+╔═════════════════╦════════╦════╦═════════════════════════════════════════════════════════════════════════╗
+║目录             ║名称    ║速度║说明                                                                     ║
+╠═════════════════╬════════╬════╬═════════════════════════════════════════════════════════════════════════╣
+║/                ║系 统 盘║一般║实例关机数据不会丢失，可存放代码等。会随保存镜像一起保存。               ║
+║/root/autodl-tmp ║数 据 盘║ 快 ║实例关机数据不会丢失，可存放读写IO要求高的数据。但不会随保存镜像一起保存 ║
+╚═════════════════╩════════╩════╩═════════════════════════════════════════════════════════════════════════╝
+[32mCPU[0m ：16 核心
+[32m内存[0m：120 GB
+[32mGPU [0m：NVIDIA GeForce RTX 4090, 1
+[32m存储[0m：
+[32m  系 统 盘/               [0m：33% 9.9G/30G
+[32m  数 据 盘/root/autodl-tmp[0m：78% 105G/135G
++----------------------------------------------------------------------------------------------------------+
+[31m*注意: [0m
+[31m1.系统盘较小请将大的数据存放于数据盘或文件存储中，重置系统时数据盘和文件存储中的数据不受影响[0m
+[31m2.清理系统盘请参考：https://www.autodl.com/docs/qa1/[0m
+[31m3.终端中长期执行命令请使用screen等工具开后台运行，确保程序不受SSH连接中断影响：https://www.autodl.com/docs/daemon/[0m
+[?2004h(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# cd autotimes[12@onda activate[C[C[C[C[C[C[C[C[C[C[7Ptmux new -s train[3@attach -t[C[C[C[C[C[C[3Pnew -s[C[C[C[C[C[Cconda activate autotimes[12Pd[C[C[C[C[C[C[C[C[C[C[Kcd autotimes[12@onda activate[C[C[C[C[C[C[C[C[C[C[12Pd[C[C[C[C[C[C[C[C[C[C[K
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# 
+[K(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# [3m python make_weather_pt_from_hourl[23m[3my[23m[3m_temperature_csv.py   --power_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/merged_include_id_filled.csv   --weather_csv /root/au[23m[3mt[23m[3modl-tmp/datasets/SelfMadeAusgridData/weather_hourly_20210501_20240430.csv   --llm_ckp_dir /root/autodl-tmp/hf_models/gpt2   --out_weather_pt weat[23m[3mh[23m[3mer_V3_only_temperature.pt [23mMMM[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C python make_weather_pt_from_hourly_temperature_csv.py   --power_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/merged_include_id_filled.csv   --weather_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/weather_hourly_20210501_20240430.csv   --llm_ckp_dir /root/autodl-tmp/hf_models/gpt2   --out_weather_pt weather_V3_only_temperature.pt 
+[?2004l
+Traceback (most recent call last):
+  File "/root/autotimes/embedding构建/weather/V3--only温度,直接用公式计算/make_weather_pt_from_hourly_temperature_csv.py", line 6, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+[?2004h(base) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# o[Kconda activate p[Kautotimes
+[?2004l
+[?2004h(autotimes) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# [3m python make_weather_pt_from_[23m[3mh[23m[3mourly_temperature_csv.py   --power_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/merged_include_id_filled.csv   --weather_csv /ro[23m[3mo[23m[3mt/autodl-tmp/datasets/SelfMadeAusgridData/weather_hourly_20210501_20240430.csv   --llm_ckp_dir /root/autodl-tmp/hf_models/gpt2   --out_weather_pt[23m[3m [23m[3mweather_V3_only_temperature.pt [23mMMM[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C python make_weather_pt_from_hourly_temperature_csv.py   --power_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/merged_include_id_filled.csv   --weather_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/weather_hourly_20210501_20240430.csv   --llm_ckp_dir /root/autodl-tmp/hf_models/gpt2   --out_weather_pt weather_V3_only_temperature.pt 
+[?2004l
+[1/5] Reading power csv...
+[POWER] N=181, T=73425
+[POWER] dt range: 2021-05-01 10:00:00 -> 2024-04-30 23:45:00
+[2/5] Reading weather csv...
+[WEATHER] rows(after groupby/filter)=4524288
+[WEATHER] station count=172
+[3/5] Loading tokenizer/model...
+
+
+Loading weights: 100%|████████████████████████████████████████████████████████| 148/148 [00:00<00:00, 2390.64it/s, Materializing param=wte.weight]
+[1mGPT2Model LOAD REPORT[0m from: /root/autodl-tmp/hf_models/gpt2
+Key                  | Status     |  | 
+---------------------+------------+--+-
+h.{0...11}.attn.bias | [38;5;208mUNEXPECTED[0m |  | 
+
+[3mNotes:
+- [38;5;208mUNEXPECTED[0m[3m	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.[0m
+[EMBED] hidden_size=768, dtype=torch.float16
+[ALLOC] weather_pt shape=(181, 73425, 768)
+[4/5] Generating embeddings...
+[STATION] sid=0, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.097, temp_min=-0.200, temp_max=38.900
+[STATION] sid=1, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=19.076, temp_min=5.500, temp_max=40.000
+[STATION] sid=2, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.738, temp_min=3.500, temp_max=41.000
+[STATION] sid=3, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.116, temp_min=1.700, temp_max=40.300
+[STATION] sid=4, written_slots=73425, raw_zero_cnt=3, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=13.110, temp_min=-0.500, temp_max=34.000
+[STATION] sid=5, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.085, temp_min=0.400, temp_max=40.400
+[STATION] sid=6, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.252, temp_min=-0.700, temp_max=38.800
+[STATION] sid=7, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=8, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=9, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=10, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=11, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=12, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=13, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.275, temp_min=4.000, temp_max=40.300
+[STATION] sid=14, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.778, temp_min=3.500, temp_max=41.000
+[WARN] sid=15 has no matched weather rows, fill with missing embedding.
+[STATION] sid=16, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.228, temp_min=3.100, temp_max=40.600
+[STATION] sid=17, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=18, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.674, temp_min=2.800, temp_max=40.200
+[STATION] sid=19, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.658, temp_min=0.900, temp_max=40.500
+[STATION] sid=20, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=19.076, temp_min=5.500, temp_max=40.000
+[STATION] sid=21, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=22, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=23, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.228, temp_min=3.100, temp_max=40.600
+[WARN] sid=24 has no matched weather rows, fill with missing embedding.
+[STATION] sid=25, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=26, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=27, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.738, temp_min=3.500, temp_max=41.000
+[STATION] sid=28, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.477, temp_min=6.000, temp_max=38.100
+[STATION] sid=29, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.880, temp_min=4.300, temp_max=39.200
+[STATION] sid=30, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=31, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.930, temp_min=1.700, temp_max=39.500
+[STATION] sid=32, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.738, temp_min=3.500, temp_max=41.000
+[STATION] sid=33, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.791, temp_min=4.600, temp_max=40.200
+[STATION] sid=34, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=35, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.576, temp_min=5.400, temp_max=37.000
+[WARN] sid=36 has no matched weather rows, fill with missing embedding.
+[STATION] sid=37, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=38, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=39, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.153, temp_min=2.800, temp_max=39.200
+[STATION] sid=40, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=41, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.253, temp_min=3.100, temp_max=40.600
+[STATION] sid=42, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.687, temp_min=5.200, temp_max=38.800
+[STATION] sid=43, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=44, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=45, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=46, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=47, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[WARN] sid=48 has no matched weather rows, fill with missing embedding.
+[STATION] sid=49, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.745, temp_min=-0.200, temp_max=39.800
+[STATION] sid=50, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.302, temp_min=3.000, temp_max=39.400
+[STATION] sid=51, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[WARN] sid=52 has no matched weather rows, fill with missing embedding.
+[STATION] sid=53, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.738, temp_min=3.500, temp_max=41.000
+[STATION] sid=54, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.404, temp_min=6.300, temp_max=38.500
+[WARN] sid=55 has no matched weather rows, fill with missing embedding.
+[STATION] sid=56, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.423, temp_min=2.500, temp_max=41.700
+[STATION] sid=57, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.902, temp_min=2.500, temp_max=40.900
+[STATION] sid=58, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.290, temp_min=5.600, temp_max=38.200
+[STATION] sid=59, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=60, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.607, temp_min=2.800, temp_max=40.000
+[STATION] sid=61, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.713, temp_min=3.500, temp_max=41.000
+[STATION] sid=62, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=63, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=64, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[WARN] sid=65 has no matched weather rows, fill with missing embedding.
+[STATION] sid=66, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.228, temp_min=3.100, temp_max=40.600
+[STATION] sid=67, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=68, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=69, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.628, temp_min=4.100, temp_max=41.500
+[STATION] sid=70, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.902, temp_min=2.500, temp_max=40.900
+[STATION] sid=71, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.228, temp_min=3.100, temp_max=40.600
+[STATION] sid=72, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.880, temp_min=4.300, temp_max=39.200
+[STATION] sid=73, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.768, temp_min=2.400, temp_max=42.200
+[STATION] sid=74, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.762, temp_min=5.200, temp_max=38.800
+[STATION] sid=75, written_slots=73425, raw_zero_cnt=8, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=13.036, temp_min=-3.000, temp_max=32.500
+[STATION] sid=76, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.131, temp_min=1.900, temp_max=39.600
+[STATION] sid=77, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.880, temp_min=4.300, temp_max=39.200
+[STATION] sid=78, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.228, temp_min=3.100, temp_max=40.600
+[STATION] sid=79, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.738, temp_min=3.500, temp_max=41.000
+[STATION] sid=80, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.353, temp_min=3.200, temp_max=40.700
+[STATION] sid=81, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.817, temp_min=2.700, temp_max=40.300
+[STATION] sid=82, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.791, temp_min=4.600, temp_max=40.200
+[STATION] sid=83, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=84, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.116, temp_min=1.700, temp_max=40.300
+[STATION] sid=85, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.444, temp_min=1.000, temp_max=40.200
+[STATION] sid=86, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=87, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.902, temp_min=2.500, temp_max=40.900
+[STATION] sid=88, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.742, temp_min=2.200, temp_max=42.000
+[STATION] sid=89, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.275, temp_min=4.000, temp_max=40.300
+[STATION] sid=90, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.423, temp_min=2.500, temp_max=41.700
+[STATION] sid=91, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.902, temp_min=2.500, temp_max=40.900
+[STATION] sid=92, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.934, temp_min=2.500, temp_max=40.600
+[STATION] sid=93, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.340, temp_min=3.900, temp_max=38.400
+[STATION] sid=94, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.082, temp_min=1.800, temp_max=39.600
+[STATION] sid=95, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=96, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.768, temp_min=2.400, temp_max=42.200
+[STATION] sid=97, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=98, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.282, temp_min=2.000, temp_max=39.800
+[STATION] sid=99, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.768, temp_min=2.400, temp_max=42.200
+[STATION] sid=100, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=101, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.950, temp_min=3.800, temp_max=41.800
+[STATION] sid=102, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.859, temp_min=2.000, temp_max=41.800
+[STATION] sid=103, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.735, temp_min=-0.100, temp_max=37.700
+[STATION] sid=104, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.818, temp_min=1.900, temp_max=41.000
+[STATION] sid=105, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.988, temp_min=0.100, temp_max=40.200
+[STATION] sid=106, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.880, temp_min=4.300, temp_max=39.200
+[STATION] sid=107, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.444, temp_min=1.000, temp_max=40.200
+[STATION] sid=108, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.871, temp_min=0.700, temp_max=40.200
+[STATION] sid=109, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.477, temp_min=6.000, temp_max=38.100
+[STATION] sid=110, written_slots=73425, raw_zero_cnt=17, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=12.847, temp_min=-2.100, temp_max=30.500
+[STATION] sid=111, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.151, temp_min=3.500, temp_max=41.800
+[STATION] sid=112, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=113, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.014, temp_min=3.600, temp_max=38.000
+[STATION] sid=114, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.738, temp_min=3.500, temp_max=41.000
+[STATION] sid=115, written_slots=73425, raw_zero_cnt=1, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.546, temp_min=-0.200, temp_max=40.300
+[STATION] sid=116, written_slots=73425, raw_zero_cnt=3, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.042, temp_min=-2.200, temp_max=38.700
+[STATION] sid=117, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.157, temp_min=5.100, temp_max=38.300
+[STATION] sid=118, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.894, temp_min=3.900, temp_max=40.600
+[STATION] sid=119, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=19.076, temp_min=5.500, temp_max=40.000
+[STATION] sid=120, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=121, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.734, temp_min=2.100, temp_max=39.800
+[STATION] sid=122, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.477, temp_min=6.000, temp_max=38.100
+[STATION] sid=123, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.667, temp_min=4.500, temp_max=40.000
+[STATION] sid=124, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.840, temp_min=3.400, temp_max=37.900
+[STATION] sid=125, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=126, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.414, temp_min=2.500, temp_max=39.600
+[STATION] sid=127, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.126, temp_min=1.800, temp_max=41.500
+[STATION] sid=128, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=129, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.043, temp_min=1.300, temp_max=39.900
+[STATION] sid=130, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=16.838, temp_min=2.200, temp_max=39.500
+[STATION] sid=131, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.862, temp_min=5.300, temp_max=38.900
+[STATION] sid=132, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.752, temp_min=2.900, temp_max=40.200
+[STATION] sid=133, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.331, temp_min=2.100, temp_max=39.800
+[STATION] sid=134, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=135, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=136, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.673, temp_min=3.000, temp_max=40.800
+[WARN] sid=137 has no matched weather rows, fill with missing embedding.
+[STATION] sid=138, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.913, temp_min=5.400, temp_max=39.000
+[STATION] sid=139, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.837, temp_min=2.100, temp_max=41.500
+[STATION] sid=140, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=141, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=142, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.228, temp_min=3.100, temp_max=40.600
+[STATION] sid=143, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.302, temp_min=3.000, temp_max=39.400
+[STATION] sid=144, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.444, temp_min=1.500, temp_max=40.200
+[STATION] sid=145, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.585, temp_min=1.500, temp_max=38.500
+[STATION] sid=146, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.934, temp_min=2.500, temp_max=40.600
+[STATION] sid=147, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.228, temp_min=3.100, temp_max=40.600
+[STATION] sid=148, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.073, temp_min=-0.100, temp_max=38.900
+[STATION] sid=149, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=150, written_slots=73425, raw_zero_cnt=1, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.546, temp_min=-0.200, temp_max=40.300
+[STATION] sid=151, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.808, temp_min=3.200, temp_max=41.300
+[STATION] sid=152, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=16.938, temp_min=2.300, temp_max=39.600
+[STATION] sid=153, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.673, temp_min=3.000, temp_max=40.800
+[STATION] sid=154, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=155, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=19.076, temp_min=5.500, temp_max=40.000
+[STATION] sid=156, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.195, temp_min=1.100, temp_max=42.000
+[STATION] sid=157, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[STATION] sid=158, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.177, temp_min=2.800, temp_max=39.200
+[STATION] sid=159, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.862, temp_min=5.300, temp_max=38.900
+[STATION] sid=160, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.833, temp_min=3.200, temp_max=41.300
+[STATION] sid=161, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.837, temp_min=2.100, temp_max=41.500
+[STATION] sid=162, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.934, temp_min=2.500, temp_max=40.600
+[STATION] sid=163, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.153, temp_min=2.900, temp_max=40.400
+[STATION] sid=164, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.818, temp_min=1.900, temp_max=41.000
+[STATION] sid=165, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=19.076, temp_min=5.500, temp_max=40.000
+[STATION] sid=166, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.837, temp_min=2.100, temp_max=41.500
+[STATION] sid=167, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.327, temp_min=2.200, temp_max=40.000
+[STATION] sid=168, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.245, temp_min=3.200, temp_max=40.000
+[STATION] sid=169, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.902, temp_min=2.500, temp_max=40.900
+[WARN] sid=170 has no matched weather rows, fill with missing embedding.
+[STATION] sid=171, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.673, temp_min=3.000, temp_max=40.800
+[STATION] sid=172, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.144, temp_min=4.700, temp_max=40.900
+[STATION] sid=173, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.760, temp_min=5.400, temp_max=39.000
+[STATION] sid=174, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.290, temp_min=5.600, temp_max=38.200
+[STATION] sid=175, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.253, temp_min=2.900, temp_max=39.300
+[STATION] sid=176, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=17.957, temp_min=4.000, temp_max=41.800
+[STATION] sid=177, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=19.038, temp_min=3.800, temp_max=40.800
+[STATION] sid=178, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.404, temp_min=6.300, temp_max=38.500
+[STATION] sid=179, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.677, temp_min=3.300, temp_max=41.200
+[STATION] sid=180, written_slots=73425, raw_zero_cnt=0, raw_nan_cnt=0, cleaned_nan_cnt=0, temp_mean=18.356, temp_min=2.100, temp_max=39.800
+[5/5] Saving...
+[OK] saved weather.pt -> weather_V3_only_temperature.pt
+[OK] shape=(181, 73425, 768), dtype=torch.float16
+[STAT] nonzero ratio=1.000000
+[SAMPLE] first nonzero at sid_idx=0, tidx=0, vec_norm=214.000565
+[?2004h(autotimes) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# ^C[?2004l
+[?2004h[?2004l
+
+[?2004h(autotimes) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# exit()
+[?2004l
+[?2004h> 
+[?2004l
+[?2004h> exit
+[?2004l
+bash: syntax error near unexpected token `exit'
+[?2004h(autotimes) root@autodl-container-51bc499713-f876aea7:~/autotimes/embedding构建/weather/V3--only温度,直接用公式计算# ei[Kxit
+[?2004l
+exit
+
+Script done on 2026-03-06 23:24:27+08:00 [COMMAND_EXIT_CODE="2"]
