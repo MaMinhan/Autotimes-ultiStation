@@ -158,6 +158,13 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
     parser.add_argument('--use_multiscale', action='store_true', default=False)
     parser.add_argument('--ms_fusion', type=str, default='sum', choices=['sum', 'weighted'])
     parser.add_argument('--ms_pattern_pool', type=int, default=4)
+    parser.add_argument('--use_prefix', action='store_true', default=False)
+    parser.add_argument('--prefix_calendar_dim', type=int, default=18)
+    parser.add_argument('--holiday_csv_path', type=str, default=None)
+    parser.add_argument('--use_social_prefix', action='store_true', default=False)
+    parser.add_argument('--prefix_social_dim', type=int, default=6)
+    parser.add_argument('--social_csv_path', type=str, default=None)
+    parser.add_argument('--station_sa4_map_path', type=str, default=None)
     # 解析命令行参数：把 --xxx 转成 args.xxx
     args = parser.parse_args()
     if args.train_pred_len is None:

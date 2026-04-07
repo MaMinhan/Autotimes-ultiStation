@@ -51,7 +51,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
     def _select_criterion(self):
         criterion = nn.MSELoss()
         return criterion
-    def _rollout_predict(self, batch_x, batch_x_mark, batch_y_mark, pred_len):
+    def _rollout_predict(self, batch_x, batch_x_mark, batch_y_mark, pred_len, prefix_calendar=None, prefix_social=None):
         """
         统一的多步滚动预测：
         - 每次模型仍输出最后一个 token_len
@@ -70,9 +70,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         for j in range(inference_steps):
             if self.args.use_amp:
                 with torch.cuda.amp.autocast():
-                    outputs = self.model(roll_x, roll_x_mark, None, batch_y_mark)
+                    outputs = self.model(roll_x, roll_x_mark, None, batch_y_mark, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
             else:
-                outputs = self.model(roll_x, roll_x_mark, None, batch_y_mark)
+                outputs = self.model(roll_x, roll_x_mark, None, batch_y_mark, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
             step_pred = outputs[:, -self.args.token_len:, :]
             pred_y.append(step_pred)
@@ -85,7 +85,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 roll_x_mark = torch.cat([roll_x_mark[:, 1:, :], tmp], dim=1)
 
         pred_y = torch.cat(pred_y, dim=1)
-
+        
         if dis != 0:
             pred_y = pred_y[:, :pred_len, :]
 
@@ -99,7 +99,19 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         self.model.eval()
 
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
+            for i, batch in enumerate(vali_loader):
+                if len(batch) == 6:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social = batch
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                    prefix_social = prefix_social.float().to(self.device)
+                elif len(batch) == 5:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar = batch
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                    prefix_social = None
+                else:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark = batch
+                    prefix_calendar = None
+                    prefix_social = None
                 iter_count += 1
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
@@ -110,7 +122,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     batch_x=batch_x,
                     batch_x_mark=batch_x_mark,
                     batch_y_mark=batch_y_mark,
-                    pred_len=pred_len
+                    pred_len=pred_len,
+                    prefix_calendar=prefix_calendar,
+                    prefix_social=prefix_social
                 )
 
                 true_y = batch_y[:, -pred_len:, :]
@@ -189,7 +203,19 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             
             self.model.train()
             epoch_time = time.time()
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
+            for i, batch in enumerate(train_loader):
+                if len(batch) == 6:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social = batch
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                    prefix_social = prefix_social.float().to(self.device)
+                elif len(batch) == 5:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar = batch
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                    prefix_social = None
+                else:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark = batch
+                    prefix_calendar = None
+                    prefix_social = None
                 iter_count += 1
                 model_optim.zero_grad()
 
@@ -223,7 +249,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     batch_x=batch_x,
                     batch_x_mark=batch_x_mark,
                     batch_y_mark=batch_y_mark,
-                    pred_len=train_pred_len
+                    pred_len=train_pred_len,
+                    prefix_calendar=prefix_calendar,
+                    prefix_social=prefix_social
                 )
 
                 chk("pred_y", pred_y)
@@ -242,29 +270,29 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     half = D // 2
 
                     with torch.no_grad():
-                        out_full = self._rollout_predict(batch_x, batch_x_mark, batch_y_mark, train_pred_len)
+                        out_full = self._rollout_predict(batch_x, batch_x_mark, batch_y_mark, train_pred_len, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
                         zeros_xm = torch.zeros_like(batch_x_mark)
                         zeros_ym = torch.zeros_like(batch_y_mark)
-                        out_zero = self._rollout_predict(batch_x, zeros_xm, zeros_ym, train_pred_len)
+                        out_zero = self._rollout_predict(batch_x, zeros_xm, zeros_ym, train_pred_len, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
                         xm_time = batch_x_mark.clone()
                         ym_time = batch_y_mark.clone()
                         xm_time[..., half:] = 0
                         ym_time[..., half:] = 0
-                        out_time = self._rollout_predict(batch_x, xm_time, ym_time, train_pred_len)
+                        out_time = self._rollout_predict(batch_x, xm_time, ym_time, train_pred_len, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
                         xm_w = batch_x_mark.clone()
                         ym_w = batch_y_mark.clone()
                         xm_w[..., :half] = 0
                         ym_w[..., :half] = 0
-                        out_w = self._rollout_predict(batch_x, xm_w, ym_w, train_pred_len)
+                        out_w = self._rollout_predict(batch_x, xm_w, ym_w, train_pred_len, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
                     print("[SANITY] full-vs-zero =", (out_full - out_zero).abs().mean().item())
                     print("[SANITY] full-vs-time =", (out_full - out_time).abs().mean().item(), "  <-- weather contribution")
                     print("[SANITY] full-vs-wthr =", (out_full - out_w).abs().mean().item(), "  <-- time contribution")
 
-                count += 1
+                #count += 1
 
                 if (i + 1) % 100 == 0:
                     if (self.args.use_multi_gpu and self.args.local_rank == 0) or not self.args.use_multi_gpu:
@@ -369,7 +397,19 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         did_mark_sanity = False
 
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            for i, batch in enumerate(test_loader):
+                if len(batch) == 6:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social = batch
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                    prefix_social = prefix_social.float().to(self.device)
+                elif len(batch) == 5:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar = batch
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                    prefix_social = None
+                else:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark = batch
+                    prefix_calendar = None
+                    prefix_social = None
                 iter_count += 1
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
@@ -407,17 +447,17 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     if (not did_mark_sanity) and i == 0 and j == 0:
                         did_mark_sanity = True
 
-                        out_full = self.model(batch_x, batch_x_mark, None, batch_y_mark)
+                        out_full = self.model(batch_x, batch_x_mark, None, batch_y_mark, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
                         zeros_xm = torch.zeros_like(batch_x_mark)
                         zeros_ym = torch.zeros_like(batch_y_mark)
-                        out_zero = self.model(batch_x, zeros_xm, None, zeros_ym)
+                        out_zero = self.model(batch_x, zeros_xm, None, zeros_ym, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
                         # 打乱 mark：沿 batch 维打乱，保持 shape 不变
                         perm = torch.randperm(batch_x_mark.size(0), device=batch_x_mark.device)
                         shuf_xm = batch_x_mark[perm]
                         shuf_ym = batch_y_mark[perm]
-                        out_shuffle = self.model(batch_x, shuf_xm, None, shuf_ym)
+                        out_shuffle = self.model(batch_x, shuf_xm, None, shuf_ym, prefix_calendar=prefix_calendar, prefix_social=prefix_social)
 
                         diff_zero = (out_full - out_zero).abs().mean().item()
                         diff_shuffle = (out_full - out_shuffle).abs().mean().item()
@@ -440,9 +480,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     else:
                         if self.args.use_amp:
                             with torch.cuda.amp.autocast():
-                                outputs = self.model(batch_x, batch_x_mark, None, batch_y_mark)
+                                outputs = self.model(
+                                    batch_x, batch_x_mark, None, batch_y_mark,
+                                    prefix_calendar=prefix_calendar, prefix_social=prefix_social
+                                )
                         else:
-                            outputs = self.model(batch_x, batch_x_mark, None, batch_y_mark)
+                            outputs = self.model(
+                                batch_x, batch_x_mark, None, batch_y_mark,
+                                prefix_calendar=prefix_calendar, prefix_social=prefix_social
+                            )
 
                     pred_y.append(outputs[:, -self.args.token_len:, :])
 

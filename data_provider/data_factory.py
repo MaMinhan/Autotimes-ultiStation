@@ -29,21 +29,11 @@ def data_provider(args, flag):
         )
         return dataset, loader
     if args.data == "custom_ms":
-        if args.data == "custom_ms":
-            if flag == "test":
-                pred_len = args.test_pred_len
-            else:
-                pred_len = args.train_pred_len
-        #pred_len = args.test_pred_len if flag == "test" else args.token_len
-        if flag == "train":
-            print(f"[DATA_FACTORY] flag={flag}, seq_len={args.seq_len}, label_len={args.label_len}, "
-                f"token_len={args.token_len}, pred_len(test_pred_len)={pred_len}")
-        elif flag == "val":
-            print(f"[DATA_FACTORY] flag={flag}, seq_len={args.seq_len}, label_len={args.label_len}, "
-                f"token_len={args.token_len}, pred_len(test_pred_len)={pred_len}")
-        elif flag == "test":
-            print(f"[DATA_FACTORY] flag={flag}, seq_len={args.seq_len}, label_len={args.label_len}, "
-                f"token_len={args.token_len}, pred_len(test_pred_len)={pred_len}")
+        if flag == "test":
+            pred_len = args.test_pred_len
+        else:
+            pred_len = args.train_pred_len
+
         dataset = Dataset_MultiStation_Custom(
             root_path=args.root_path,
             flag=flag,
@@ -61,23 +51,27 @@ def data_provider(args, flag):
             fillna_value=getattr(args, "ms_fillna_value", None),
             scale=getattr(args, "ms_scale", False),
             return_sid=False,
+            use_social_prefix=getattr(args, "use_social_prefix", False),
+            social_csv_path=getattr(args, "social_csv_path", None),
+            use_prefix=getattr(args, "use_prefix", False),
+            holiday_csv_path=getattr(args, "holiday_csv_path", None),
         )
-        
+
         sampler = None
         shuffle = (flag == "train")
         if getattr(args, "use_multi_gpu", False):
-            # run.py 里 use_multi_gpu 会 init_process_group
             sampler = DistributedSampler(dataset, shuffle=shuffle)
             shuffle = False
-        
+
         loader = DataLoader(
             dataset,
             batch_size=args.batch_size,
-            shuffle=shuffle,
-            sampler=sampler,
+            shuffle=shuffle if sampler is None else False,
             num_workers=args.num_workers,
-            drop_last=args.drop_last,
+            drop_last=getattr(args, "drop_last", False),
+            sampler=sampler
         )
+
         return dataset, loader
 
 

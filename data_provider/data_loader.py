@@ -58,31 +58,37 @@ class Dataset_MultiStation_Custom(Dataset):
         self,
         root_path,
         flag="train",
-        size=None,                 # [seq_len, label_len, pred_len_or_token_len]
+        size=None,
         data_path="",
-        time_pt_path="",         # e.g. /root/.../time_only_20260129.pt
+        time_pt_path="",
         weather_pt_path='',
         freq_minutes=15,
-        scale=False,               # 先默认不做 scaler（multi-station + missing 更麻烦）
+        scale=False,
         train_ratio=0.7,
         val_ratio=0.1,
-        require_contiguous=False,  # True: 窗口内必须严格 15min 连续，否则跳过
-        fillna_value=None,         # None: keep NaN；或填 0 / 前向填充等（按你策略）
-        return_sid=True,          # 如果需要站点级评估：用 sid_idx（return_sid=True）
-        exog_cols=None,            # list[str] 外生变量列名（可选）
+        require_contiguous=False,
+        fillna_value=None,
+        return_sid=True,
+        exog_cols=None,
         token_len=None,
-        weather_read_mode="torch",   # 新增
-        weather_shard_dir="",        # 新增
+        weather_read_mode="torch",
+        weather_shard_dir="",
+        holiday_csv_path=None,
+        use_prefix=False,
+        use_social_prefix=False,
+        social_csv_path=None,
     ):
 
         assert size is not None, "size must be provided"
         assert flag in ["train", "val", "test"]
-
+        self.holiday_csv_path = holiday_csv_path
+        self.use_prefix = use_prefix
         self.root_path = root_path
         self.data_path = data_path
         self.flag = flag
         self.seq_len, self.label_len, self.pred_len = size
-
+        self.use_social_prefix = use_social_prefix
+        self.social_csv_path = social_csv_path
         if token_len is None:
             self.token_len = self.seq_len - self.label_len
         else:
@@ -188,8 +194,44 @@ class Dataset_MultiStation_Custom(Dataset):
             self.weather_pt = None
             self.weather_shards = []
             print("[WEATHER_PT] not provided, use time_pt only")
+        self.social_cols = [
+            "pop_density_per_sqkm_norm",
+            "young_ratio_0_14_norm",
+            "working_ratio_15_64_norm",
+            "elderly_ratio_65_plus_norm",
+            "private_dwelling_ratio_norm",
+            "other_dwelling_ratio_norm",
+        ]
 
+        self.social_dict = {}
+
+        if self.use_social_prefix and self.social_csv_path is not None and os.path.exists(self.social_csv_path):
+            df_s = pd.read_csv(self.social_csv_path, skipinitialspace=True)
+            df_s.columns = df_s.columns.str.strip()
+
+            df_s["stationname"] = df_s["stationname"].astype(str).str.strip()
+
+            for col in self.social_cols:
+                df_s[col] = pd.to_numeric(df_s[col], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+
+            for _, row in df_s.iterrows():
+                station_name = row["stationname"]
+                vec = row[self.social_cols].values.astype(np.float32)
+                self.social_dict[station_name] = vec
+            self.sid_to_station = {}
+            if self.use_social_prefix:
+                for sid_idx, station_name in enumerate(self.stations):
+                    self.sid_to_station[sid_idx] = str(station_name).strip()
         self.__build_index_map__()
+    def _build_social_prefix(self, sid_idx):
+        if not self.use_social_prefix:
+            return None
+
+        station_name = self.sid_to_station.get(sid_idx, None)
+        if station_name is None or station_name not in self.social_dict:
+            return torch.zeros(len(self.social_cols), dtype=torch.float32)
+
+        return torch.tensor(self.social_dict[station_name], dtype=torch.float32)
     def _get_weather_station_tensor_from_shard(self, sid_idx):
         for shard in self.weather_shards:
             if shard["start_sid"] <= sid_idx <= shard["end_sid"]:
@@ -342,7 +384,19 @@ class Dataset_MultiStation_Custom(Dataset):
         if self.weather_pt is not None:
             print(f"[WEATHER] weather_pt shape={tuple(self.weather_pt.shape)} dtype={self.weather_pt.dtype}", flush=True)
             print(f"[WEATHER] N(stations)={len(self.stations)} T(dt)={self.T}", flush=True)
+        #holiday prefix
+        self.holiday_dates = set()
+        if self.holiday_csv_path is not None and os.path.exists(self.holiday_csv_path):
+            df_h = pd.read_csv(self.holiday_csv_path)
+            df_h["date"] = pd.to_datetime(df_h["date"]).dt.date
+            df_h["is_holiday"] = df_h["is_holiday"].astype(str).str.lower().map({
+                "true": True,
+                "false": False,
+                "1": True,
+                "0": False
+            })
 
+            self.holiday_dates = set(df_h.loc[df_h["is_holiday"] == True, "date"].tolist())
     def __window_has_break(self, l, r):
         """
         判断 (l, r] 区间内是否存在 breaks（即 l+1..r 有断点）
@@ -443,12 +497,90 @@ class Dataset_MultiStation_Custom(Dataset):
                 f"y_mark token num mismatch: got {seq_y_mark.shape[0]}, "
                 f"expected {expected_y_tokens}"
             )
-        if self.return_sid:
-            return seq_x, seq_y, seq_x_mark, seq_y_mark, sid_idx
 
         assert seq_x_mark.std() > 0, "time.pt loaded but seq_x_mark is zero!"
         if not hasattr(self, "_dbg_markdim_once"):
             self._dbg_markdim_once = True
             print("[MARK DIM]", seq_x_mark.shape[-1], flush=True)
 
-        return seq_x, seq_y, seq_x_mark, seq_y_mark
+        prefix_calendar = None
+        if self.use_prefix:
+            # 预测第一个未来 token 的起始时间
+            ts_prefix = pd.Timestamp(self.dt[s_end])
+            prefix_calendar = self._build_calendar_prefix(ts_prefix)
+
+        prefix_social = None
+        if self.use_social_prefix:
+            prefix_social = self._build_social_prefix(sid_idx)
+
+        if prefix_calendar is None:
+            prefix_calendar = torch.zeros(18, dtype=torch.float32)
+
+        if prefix_social is None:
+            prefix_social = torch.zeros(6, dtype=torch.float32)
+
+        return seq_x, seq_y, seq_x_mark, seq_y_mark, prefix_calendar, prefix_social
+
+    def _build_calendar_prefix(self, ts):
+        """
+        ts: pandas.Timestamp
+        return: torch.FloatTensor [18]
+        feature order:
+        [month_norm] +
+        [season_onehot(4)] +
+        [dow_onehot(7)] +
+        [day_type_onehot(3: workday/weekend/holiday)] +
+        [holiday_rel_onehot(3: holiday-1 / holiday / holiday+1)]
+        """
+
+        # 1) month_norm
+        month_norm = [ts.month / 12.0]
+
+        # 2) season onehot (Australian / NSW seasons)
+        # spring: 9,10,11
+        # summer: 12,1,2
+        # autumn: 3,4,5
+        # winter: 6,7,8
+        # 顺序固定为 [spring, summer, autumn, winter]
+        season = [0.0, 0.0, 0.0, 0.0]
+        if ts.month in [9, 10, 11]:
+            season[0] = 1.0   # spring
+        elif ts.month in [12, 1, 2]:
+            season[1] = 1.0   # summer
+        elif ts.month in [3, 4, 5]:
+            season[2] = 1.0   # autumn
+        else:
+            season[3] = 1.0   # winter
+
+        # 3) day-of-week onehot: Monday=0 ... Sunday=6
+        dow = [0.0] * 7
+        dow[ts.weekday()] = 1.0
+
+        # 4) holiday / weekend / workday
+        d = ts.date()
+        is_holiday = d in self.holiday_dates
+        is_weekend = ts.weekday() >= 5
+        is_workday = (not is_weekend) and (not is_holiday)
+
+        day_type = [0.0, 0.0, 0.0]  # [workday, weekend, holiday]
+        if is_workday:
+            day_type[0] = 1.0
+        elif is_weekend and (not is_holiday):
+            day_type[1] = 1.0
+        else:
+            day_type[2] = 1.0
+
+        # 5) holiday relative: holiday-1 / holiday / holiday+1
+        prev_day = (ts - pd.Timedelta(days=1)).date()
+        next_day = (ts + pd.Timedelta(days=1)).date()
+
+        holiday_rel = [0.0, 0.0, 0.0]
+        if next_day in self.holiday_dates:
+            holiday_rel[0] = 1.0   # holiday-1：明天是节假日
+        if d in self.holiday_dates:
+            holiday_rel[1] = 1.0   # holiday：今天是节假日
+        if prev_day in self.holiday_dates:
+            holiday_rel[2] = 1.0   # holiday+1：昨天是节假日
+
+        feat = month_norm + season + dow + day_type + holiday_rel
+        return torch.tensor(feat, dtype=torch.float32)

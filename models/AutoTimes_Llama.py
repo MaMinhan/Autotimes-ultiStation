@@ -137,6 +137,29 @@ class Model(nn.Module):
                     print("[MODEL INIT] ms_fusion =", self.ms_fusion)
                     print("[MODEL INIT] pattern_len =", self.pattern_len)
                     #print("[MODEL INIT] rr_len =", self.rr_len)
+                    # ===== calendar prefix =====
+            self.use_prefix = getattr(configs, "use_prefix", False)
+            self.prefix_calendar_dim = getattr(configs, "prefix_calendar_dim", 18)
+
+            if self.use_prefix:
+                self.calendar_prefix_proj = nn.Linear(self.prefix_calendar_dim, self.hidden_dim_of_llama)
+                self.calendar_prefix_norm = nn.LayerNorm(self.hidden_dim_of_llama)
+            self.use_social_prefix = getattr(configs, "use_social_prefix", False)
+
+            self.prefix_social_dim = getattr(configs, "prefix_social_dim", 6)
+
+            if self.use_social_prefix:
+                self.social_prefix_proj = nn.Linear(self.prefix_social_dim, self.hidden_dim_of_llama)
+                self.social_prefix_norm = nn.LayerNorm(self.hidden_dim_of_llama)
+    def build_social_prefix_embeds(self, prefix_social, bs, n_vars):
+        if prefix_social is None:
+            return None
+
+        soc = self.social_prefix_proj(prefix_social)
+        soc = self.social_prefix_norm(soc)
+        soc = soc.unsqueeze(1).repeat(1, n_vars, 1)
+        soc = soc.reshape(bs * n_vars, 1, self.hidden_dim_of_llama)
+        return soc
     def build_multiscale_embeds(self, fold_out):
         """
         fold_out: [B*C, token_num, token_len]
@@ -147,10 +170,13 @@ class Model(nn.Module):
 
         # pattern token: 每 4 点聚合 -> 24 点
         p = self.ms_pattern_pool
-        pattern = fold_out.reshape(
-            fold_out.shape[0], fold_out.shape[1], self.pattern_len, p
-        ).mean(dim=-1)  # [BC, T, 24]
+        # ===== pattern prior: 用历史日块平均 profile，而不是当天自身粗采样 =====
+        pattern_prior = fold_out.mean(dim=1, keepdim=True)   # [BC, 1, 96]
+        pattern_prior = pattern_prior.repeat(1, fold_out.shape[1], 1)  # [BC, T, 96]
 
+        pattern = pattern_prior.reshape(
+            fold_out.shape[0], fold_out.shape[1], self.pattern_len, p
+        ).mean(dim=-1)   # [BC, T, 24]
         # ramp token: 平滑后的一阶差分
         # replicate pad on last dimension
         x_pad = torch.nn.functional.pad(fold_out, (1, 1), mode='replicate')
@@ -179,7 +205,20 @@ class Model(nn.Module):
             raise ValueError(f"Unsupported ms_fusion={self.ms_fusion}")
 
         return z
-    def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
+    def build_prefix_embeds(self, prefix_calendar, bs, n_vars):
+        """
+        prefix_calendar: [B, 18]
+        return: [B*C, 1, H]
+        """
+        if prefix_calendar is None:
+            return None
+
+        cal = self.calendar_prefix_proj(prefix_calendar)     # [B, H]
+        cal = self.calendar_prefix_norm(cal)
+        cal = cal.unsqueeze(1).repeat(1, n_vars, 1)          # [B, C, H]
+        cal = cal.reshape(bs * n_vars, 1, self.hidden_dim_of_llama)
+        return cal
+    def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec, prefix_calendar=None, prefix_social=None):
         means = x_enc.mean(1, keepdim=True).detach()
         x_enc = x_enc - means
         stdev = torch.sqrt(torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5)
@@ -271,13 +310,32 @@ class Model(nn.Module):
         llama_dtype = llama_param.dtype
         times_embeds = times_embeds.to(device=llama_device, dtype=llama_dtype)
 
+        prefix_list = []
+
+        if self.use_prefix:
+            cal_prefix = self.build_prefix_embeds(prefix_calendar, bs, n_vars)
+            if cal_prefix is not None:
+                prefix_list.append(cal_prefix)
+
+        if self.use_social_prefix:
+            soc_prefix = self.build_social_prefix_embeds(prefix_social, bs, n_vars)
+            if soc_prefix is not None:
+                prefix_list.append(soc_prefix)
+
+        prefix_embeds = None
+        if len(prefix_list) > 0:
+            prefix_embeds = torch.cat(prefix_list, dim=1)
+            prefix_embeds = prefix_embeds.to(device=times_embeds.device, dtype=times_embeds.dtype)
+            times_embeds = torch.cat([prefix_embeds, times_embeds], dim=1)
         # Llama forward
         outputs = self.llama.model(inputs_embeds=times_embeds)[0]
 
         # 出来后：转成 decoder 的 dtype/device
         decoder_param = next(self.decoder.parameters())
         outputs = outputs.to(device=decoder_param.device, dtype=decoder_param.dtype)
-
+        if prefix_embeds is not None:
+            prefix_len = prefix_embeds.shape[1]   # 这里第一版是 1
+            outputs = outputs[:, prefix_len:, :]
         dec_out = self.decoder(outputs)
 
         dec_out = dec_out.reshape(bs, n_vars, -1)
@@ -292,5 +350,12 @@ class Model(nn.Module):
 
         return dec_out
 
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
-        return self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
+    def forward(
+        self, x_enc, x_mark_enc, x_dec, x_mark_dec,
+        prefix_calendar=None, prefix_social=None
+    ):
+        return self.forecast(
+            x_enc, x_mark_enc, x_dec, x_mark_dec,
+            prefix_calendar=prefix_calendar,
+            prefix_social=prefix_social
+        )

@@ -10,58 +10,65 @@ IDLE_TIME = 30  # 1分钟
 commands = [
 '''python run.py \
   --task_name long_term_forecast \
-  --des "0403——多尺度预测_pred_len=384_Llama_time+temp(average)" \
+  --des "0407——holidayprefix全量数据_GPT2_time_temp" \
   --is_training 1 \
   --model_id ms_ausgrid_multi_station \
-  --model AutoTimes_Llama \
+  --model AutoTimes_Gpt2 \
   --data custom_ms \
   --root_path /root/autodl-tmp/datasets/SelfMadeAusgridData \
-  --data_path /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/load_10stations_20240101_20240430.csv \
+  --data_path /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/merged_include_id_filled.csv \
   --use_time 0 \
   --use_weather 1 \
-  --weather_pt_path /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/weather_token96_llama_simple_version2_0325_weather_time.pt \
+  --weather_pt_path /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt \
+  --weather_read_mode torch \
+  --use_prefix \
+  --holiday_csv_path /root/autodl-tmp/datasets/SelfMadeAusgridData/节假日/holiday.csv \
+  --prefix_calendar_dim 18 \
   --seq_len 672 \
   --label_len 576 \
   --token_len 96 \
   --test_seq_len 672 \
   --test_label_len 576 \
-  --test_pred_len 384 \
-  --train_pred_len 384 \
-  --batch_size 12 \
+  --test_pred_len 96 \
+  --train_pred_len 96 \
+  --batch_size 672 \
   --learning_rate 1e-4 \
   --num_workers 10 \
   --gpu 0 \
   --checkpoints /root/autodl-tmp/checkpoints \
   --ms_scale 1 \
-  --llm_ckp_dir /root/autodl-tmp/hf_models/llama \
+  --llm_ckp_dir /root/autodl-tmp/hf_models/gpt2 \
   --mlp_hidden_dim 256 \
   --mlp_hidden_layers 2 \
-  --train_epochs 1 \
+  --train_epochs 3 \
   --patience 1 \
-  --mark_input_dim 4096 \
+  --mark_input_dim 768 \
   --use_amp \
   --mix_embeds 
 ''',
 '''python run.py \
   --task_name long_term_forecast \
-  --des "0403——多尺度预测_pred_len=484_Llama_time+temp(average)" \
+  --des "0407_holidayprefix_多尺度" \
   --is_training 1 \
-  --model_id ms_ausgrid_multi_station \
+  --model_id ms_aus10 \
   --model AutoTimes_Llama \
   --data custom_ms \
   --root_path /root/autodl-tmp/datasets/SelfMadeAusgridData \
   --data_path /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/load_10stations_20240101_20240430.csv \
   --use_time 0 \
   --use_weather 1 \
-  --weather_pt_path /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/weather_token96_llama_simple_version2_0325_weather_time.pt \
+  --weather_pt_path /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/simple_weather_holiday_token96_llama.pt \
+  --use_prefix \
+  --holiday_csv_path /root/autodl-tmp/datasets/SelfMadeAusgridData/节假日/holiday.csv \
+  --prefix_calendar_dim 18 \
   --seq_len 672 \
   --label_len 576 \
   --token_len 96 \
+  --train_pred_len 96 \
   --test_seq_len 672 \
   --test_label_len 576 \
-  --test_pred_len 480 \
-  --train_pred_len 480 \
-  --batch_size 12 \
+  --test_pred_len 96 \
+  --batch_size 20 \
   --learning_rate 1e-4 \
   --num_workers 10 \
   --gpu 0 \
@@ -74,40 +81,44 @@ commands = [
   --patience 1 \
   --mark_input_dim 4096 \
   --use_amp \
-  --mix_embeds ''',
+  --mix_embeds \
+  --use_multiscale \
+  --ms_fusion weighted \
+  --ms_pattern_pool 4''',
   '''python run.py \
   --task_name long_term_forecast \
-  --des "0403——多尺度预测_pred_len=576_Llama_time+temp(average)" \
+  --des "0407——纯序列多尺度" \
   --is_training 1 \
   --model_id ms_ausgrid_multi_station \
-  --model AutoTimes_Llama \
+  --model AutoTimes_Gpt2 \
   --data custom_ms \
   --root_path /root/autodl-tmp/datasets/SelfMadeAusgridData \
-  --data_path /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/load_10stations_20240101_20240430.csv \
+  --data_path /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/merged_include_id_filled.csv \
   --use_time 0 \
-  --use_weather 1 \
-  --weather_pt_path /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/weather_token96_llama_simple_version2_0325_weather_time.pt \
+  --use_weather 0 \
   --seq_len 672 \
   --label_len 576 \
   --token_len 96 \
   --test_seq_len 672 \
   --test_label_len 576 \
-  --test_pred_len 576 \
-  --train_pred_len 576 \
-  --batch_size 12 \
+  --test_pred_len 96 \
+  --train_pred_len 96 \
+  --batch_size 672 \
   --learning_rate 1e-4 \
   --num_workers 10 \
   --gpu 0 \
   --checkpoints /root/autodl-tmp/checkpoints \
   --ms_scale 1 \
-  --llm_ckp_dir /root/autodl-tmp/hf_models/llama \
+  --llm_ckp_dir /root/autodl-tmp/hf_models/gpt2 \
   --mlp_hidden_dim 256 \
   --mlp_hidden_layers 2 \
-  --train_epochs 1 \
+  --train_epochs 3 \
   --patience 1 \
-  --mark_input_dim 4096 \
+  --mark_input_dim 768 \
   --use_amp \
-  --mix_embeds '''
+  --use_multiscale \
+  --ms_fusion weighted \
+  --ms_pattern_pool 4'''
   ]
 
 def get_gpu_info(gpu_id):
