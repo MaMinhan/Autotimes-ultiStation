@@ -165,7 +165,18 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
     parser.add_argument('--prefix_social_dim', type=int, default=6)
     parser.add_argument('--social_csv_path', type=str, default=None)
     parser.add_argument('--station_sa4_map_path', type=str, default=None)
-    # 解析命令行参数：把 --xxx 转成 args.xxx
+    parser.add_argument('--export_predictions', action='store_true', default=False,
+                    help='导出 prediction 结果')
+    parser.add_argument('--export_all_splits', action='store_true', default=False,
+                        help='一次性导出 train/val/test 三个 split')
+    parser.add_argument('--export_split', type=str, default='test',
+                        choices=['train', 'val', 'test'],
+                        help='只导出单个 split')
+    parser.add_argument('--export_save_dir', type=str, default='./xgb_exports',
+                        help='prediction parquet 保存目录')
+    parser.add_argument('--export_chunk_size', type=int, default=100000,
+                        help='export parquet 分块写盘大小，避免OOM')
+        
     args = parser.parse_args()
     if args.train_pred_len is None:
         args.train_pred_len = args.token_len
@@ -236,19 +247,36 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
             if (args.use_multi_gpu and args.local_rank == 0) or not args.use_multi_gpu:
                 print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
 
-            exp.train(setting)  # 训练：内部会跑epoch、验证、early stopping、保存checkpoint
+            exp.train(setting)  # 训练
 
             if (args.use_multi_gpu and args.local_rank == 0) or not args.use_multi_gpu:
                 print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
 
-            exp.test(setting)   # 测试：读取训练好的checkpoint，在test集上评估指标并输出结果
+            exp.test(setting)   # 常规测试
 
-            torch.cuda.empty_cache()  # 清理显存碎片（不一定必要，但有时能缓解显存抖动）
+            # 训练完成后，基于同一个 best ckpt 导出 prediction
+            if getattr(args, "export_all_splits", False):
+                exp.export_all_predictions(
+                    setting=setting,
+                    test=0,
+                    save_dir=args.export_save_dir,
+                    chunk_size=args.export_chunk_size
+                )
+            elif getattr(args, "export_predictions", False):
+                exp.export_predictions(
+                    setting=setting,
+                    split=args.export_split,
+                    test=0,
+                    save_dir=args.export_save_dir,
+                    chunk_size=args.export_chunk_size
+                )
+
+            torch.cuda.empty_cache()
 
     # ========== 6) 只测试模式：不训练，直接加载指定checkpoint测试 ==========
     else:
         ii = 0  # 只测时固定编号0
-        setting = '{}_{}_{}_{}_sl{}_ll{}_tl{}_tpl{}_lr{}_bt{}_wd{}_hd{}_hl{}_cos{}_mix{}_{}_ep{}_itr{}'.format(
+        setting = '{}_{}_{}_{}_sl{}_ll{}_tl{}_tpl{}_lr{}_bt{}_wd{}_hd{}_hl{}_cos{}_mix{}_{}_ep{}_mark_input_dim{}_itr{}'.format(
             args.task_name,
             args.model_id,
             args.model,
@@ -267,9 +295,30 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
             args.des,
             args.ms_scale,
             args.train_epochs,
+            args.mark_input_dim,
             ii
         )
 
-        exp = Exp(args)             # 构造实验对象（会build model）
-        exp.test(setting, test=1)   # test=1 通常表示“从 args.test_dir/args.test_file_name 加载”
+        exp = Exp(args)
+
+        # 只测试模式：先常规 test
+        exp.test(setting, test=1)
+
+        # 如需导出 prediction，再继续导出
+        if getattr(args, "export_all_splits", False):
+            exp.export_all_predictions(
+                setting=setting,
+                test=1,
+                save_dir=args.export_save_dir,
+                chunk_size=args.export_chunk_size
+            )
+        elif getattr(args, "export_predictions", False):
+            exp.export_predictions(
+                setting=setting,
+                split=args.export_split,
+                test=1,
+                save_dir=args.export_save_dir,
+                chunk_size=args.export_chunk_size
+            )
+
         torch.cuda.empty_cache()

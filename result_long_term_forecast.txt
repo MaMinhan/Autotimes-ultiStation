@@ -491,3 +491,84 @@ seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 
 batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
 mse: 0.4060421586036682, mae: 0.40736907720565796
 
+========================================================================================================================
+setting: long_term_forecast_ms_aus10_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407_holiday+social_prefix_ep1_mark_input_dim3_itr768
+ckpt_path: /root/autodl-tmp/checkpoints/long_term_forecast_ms_aus10_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407_holiday+social_prefix_ep1_mark_input_dim3_itr768/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 96
+batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.36859047412872314, mae: 0.3884086608886719
+
+========================================================================================================================
+setting: long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——holidayprefix+多尺度全量数据_GPT2_time_temp_ep1_mark_input_dim3_itr768
+ckpt_path: /root/autodl-tmp/checkpoints/long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——holidayprefix+多尺度全量数据_GPT2_time_temp_ep1_mark_input_dim3_itr768/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 96
+batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.36789175868034363, mae: 0.38853421807289124
+
+========================================================================================================================
+setting: long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl192_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——holidayprefix全量数据_GPT2_time_temp_ep1_mark_input_dim3_itr768
+ckpt_path: /root/autodl-tmp/checkpoints/long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl192_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——holidayprefix全量数据_GPT2_time_temp_ep1_mark_input_dim3_itr768/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 192
+batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.47708815336227417, mae: 0.44601625204086304
+
+========================================================================================================================
+setting: long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl192_lr5e-05_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407_holidayprefix_full_GPT2_time_temp_stage1_lr5e-5_ep1_mark_input_dim3_itr768
+ckpt_path: /root/autodl-tmp/checkpoints/long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl192_lr5e-05_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407_holidayprefix_full_GPT2_time_temp_stage1_lr5e-5_ep1_mark_input_dim3_itr768/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 192
+batch_size: 576, learning_rate: 5e-05, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.4711814522743225, mae: 0.444484680891037
+
+========================================================================================================================
+setting: long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl192_lr0.0002_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407_holidayprefix_full_GPT2_time_temp_stage1_lr2e-4_ep1_mark_input_dim3_itr768
+ckpt_path: /root/autodl-tmp/checkpoints/long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl192_lr0.0002_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407_holidayprefix_full_GPT2_time_temp_stage1_lr2e-4_ep1_mark_input_dim3_itr768/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 192
+batch_size: 576, learning_rate: 0.0002, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.4894563555717468, mae: 0.4523528814315796
+
+========================================================================================================================
+setting: /root/autodl-tmp/checkpoints/XGBoost/GPT2_多尺度weighted_全量数据_time-temp
+ckpt_path: /root/autodl-tmp/checkpoints/XGBoost/GPT2_多尺度weighted_全量数据_time-temp/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 96
+batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.3563874363899231, mae: 0.3828042149543762
+
+========================================================================================================================
+setting: /root/autodl-tmp/checkpoints/XGBoost/GPT2_多尺度weighted_全量数据_time-temp
+ckpt_path: /root/autodl-tmp/checkpoints/XGBoost/GPT2_多尺度weighted_全量数据_time-temp/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 96
+batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.3563874363899231, mae: 0.3828042149543762
+
+========================================================================================================================
+setting: long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——多尺度全量数据_GPT2_time_temp_ep1_mark_input_dim3_itr768
+ckpt_path: /root/autodl-tmp/checkpoints/long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——多尺度全量数据_GPT2_time_temp_ep1_mark_input_dim3_itr768/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 96
+batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.3563874363899231, mae: 0.3828042149543762
+
+========================================================================================================================
+setting: long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——多尺度全量数据_GPT2_time_temp_ep1_mark_input_dim1_itr768
+ckpt_path: /root/autodl-tmp/checkpoints/long_term_forecast_ms_ausgrid_multi_station_AutoTimes_Gpt2_custom_ms_sl672_ll576_tl96_tpl96_lr0.0001_bt576_wd0_hd256_hl2_cosFalse_mixTrue_0407——多尺度全量数据_GPT2_time_temp_ep1_mark_input_dim1_itr768/checkpoint.pth
+time_pt_path: 
+weather_pt_path: /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt
+seq_len: 672, label_len: 576, token_len: 96, test_seq_len: 672, test_label_len: 576, test_pred_len: 96
+batch_size: 576, learning_rate: 0.0001, weight_decay: 0, ms_scale: 1, mix_embeds: True
+mse: 0.36885809898376465, mae: 0.39302748441696167
+

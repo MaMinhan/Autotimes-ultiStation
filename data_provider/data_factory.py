@@ -55,6 +55,10 @@ def data_provider(args, flag):
             social_csv_path=getattr(args, "social_csv_path", None),
             use_prefix=getattr(args, "use_prefix", False),
             holiday_csv_path=getattr(args, "holiday_csv_path", None),
+            return_meta=(
+                getattr(args, "export_predictions", False)
+                or getattr(args, "export_all_splits", False)
+            )
         )
 
         sampler = None

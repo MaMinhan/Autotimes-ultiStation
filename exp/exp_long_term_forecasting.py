@@ -100,18 +100,12 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         with torch.no_grad():
             for i, batch in enumerate(vali_loader):
-                if len(batch) == 6:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social = batch
+                batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta = self._parse_batch(batch)
+
+                if prefix_calendar is not None:
                     prefix_calendar = prefix_calendar.float().to(self.device)
+                if prefix_social is not None:
                     prefix_social = prefix_social.float().to(self.device)
-                elif len(batch) == 5:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar = batch
-                    prefix_calendar = prefix_calendar.float().to(self.device)
-                    prefix_social = None
-                else:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark = batch
-                    prefix_calendar = None
-                    prefix_social = None
                 iter_count += 1
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
@@ -204,18 +198,12 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             self.model.train()
             epoch_time = time.time()
             for i, batch in enumerate(train_loader):
-                if len(batch) == 6:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social = batch
+                batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta = self._parse_batch(batch)
+
+                if prefix_calendar is not None:
                     prefix_calendar = prefix_calendar.float().to(self.device)
+                if prefix_social is not None:
                     prefix_social = prefix_social.float().to(self.device)
-                elif len(batch) == 5:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar = batch
-                    prefix_calendar = prefix_calendar.float().to(self.device)
-                    prefix_social = None
-                else:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark = batch
-                    prefix_calendar = None
-                    prefix_social = None
                 iter_count += 1
                 model_optim.zero_grad()
 
@@ -398,18 +386,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         with torch.no_grad():
             for i, batch in enumerate(test_loader):
-                if len(batch) == 6:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social = batch
+                batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta = self._parse_batch(batch)
+
+                if prefix_calendar is not None:
                     prefix_calendar = prefix_calendar.float().to(self.device)
+                if prefix_social is not None:
                     prefix_social = prefix_social.float().to(self.device)
-                elif len(batch) == 5:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar = batch
-                    prefix_calendar = prefix_calendar.float().to(self.device)
-                    prefix_social = None
-                else:
-                    batch_x, batch_y, batch_x_mark, batch_y_mark = batch
-                    prefix_calendar = None
-                    prefix_social = None
+
                 iter_count += 1
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
@@ -548,3 +531,241 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             )
             f.write(f"mse: {mse}, mae: {mae}\n")
             f.write("\n")
+    def export_predictions(self, setting, split="test", test=0, save_dir="./xgb_exports", chunk_size=100000):
+        """
+        导出 AutoTimes 在某个 split(train/val/test) 上的逐样本逐horizon预测明细。
+        改为：
+        1) parquet 分块写盘
+        2) 流式存储，避免 OOM
+
+        输出目录结构：
+        save_dir/
+            {setting}_{split}_predictions/
+                part_00000.parquet
+                part_00001.parquet
+                ...
+        """
+        import os
+        import gc
+        import shutil
+        import pandas as pd
+        import torch
+
+        assert split in ["train", "val", "test"], f"split must be train/val/test, got {split}"
+
+        # 1) 取数据
+        data_set, data_loader = self._get_data(flag=split)
+
+        # 2) 加载 checkpoint
+        if test:
+            print("loading model for export...")
+            ckpt_setting = self.args.test_dir
+            best_model_path = self.args.test_file_name
+            ckpt_path = os.path.join(self.args.checkpoints, ckpt_setting, best_model_path)
+
+            print("loading model from {}".format(ckpt_path))
+            load_item = torch.load(ckpt_path, map_location="cpu")
+            self.model.load_state_dict({k.replace('module.', ''): v for k, v in load_item.items()}, strict=False)
+            setting = ckpt_setting
+        else:
+            ckpt_path = os.path.join(self.args.checkpoints, setting, "checkpoint.pth")
+            if os.path.exists(ckpt_path):
+                print("loading model from {}".format(ckpt_path))
+                load_item = torch.load(ckpt_path, map_location="cpu")
+                self.model.load_state_dict({k.replace('module.', ''): v for k, v in load_item.items()}, strict=False)
+            else:
+                print("[WARN] checkpoint not found, export will use current in-memory model:", ckpt_path)
+
+        # 3) 确定预测长度
+        if split == "test":
+            pred_len = self.args.test_pred_len
+        else:
+            pred_len = getattr(self.args, "train_pred_len", self.args.token_len)
+
+        print(f"[EXPORT] split={split}, pred_len={pred_len}")
+        print(f"[EXPORT] ckpt_path={ckpt_path}")
+
+        self.model.eval()
+        os.makedirs(save_dir, exist_ok=True)
+
+        # 4) 输出目录：一个 split 一个目录，目录里存多个 parquet part
+        out_dir = os.path.join(save_dir, f"{setting}_{split}_predictions")
+        if os.path.exists(out_dir):
+            shutil.rmtree(out_dir)
+        os.makedirs(out_dir, exist_ok=True)
+
+        buffer_rows = []
+        total_rows = 0
+        part_idx = 0
+        freq_minutes = getattr(self.args, "freq_minutes", 15)
+
+        def flush_buffer_to_parquet(rows_buffer, current_part_idx):
+            if len(rows_buffer) == 0:
+                return 0
+
+            chunk_df = pd.DataFrame(rows_buffer)
+
+            # 建议尽量压缩一下，减少磁盘体积
+            save_path = os.path.join(out_dir, f"part_{current_part_idx:05d}.parquet")
+            chunk_df.to_parquet(save_path, index=False, engine="pyarrow", compression="snappy")
+
+            flushed_rows = len(chunk_df)
+            print(f"[EXPORT] flushed {flushed_rows} rows -> {save_path}")
+
+            del chunk_df
+            gc.collect()
+            return flushed_rows
+
+        with torch.no_grad():
+            for i, batch in enumerate(data_loader):
+                batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta = self._parse_batch(batch)
+
+                if meta is None:
+                    raise ValueError(
+                        "meta is None. Please modify Dataset_MultiStation_Custom and data_factory "
+                        "so that dataloader returns meta when exporting predictions."
+                    )
+
+                batch_x = batch_x.float().to(self.device)
+                batch_y = batch_y.float().to(self.device)
+                batch_x_mark = batch_x_mark.float().to(self.device)
+                batch_y_mark = batch_y_mark.float().to(self.device)
+
+                if prefix_calendar is not None:
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                if prefix_social is not None:
+                    prefix_social = prefix_social.float().to(self.device)
+
+                # 用统一 rollout 逻辑得到多步预测
+                pred_y = self._rollout_predict(
+                    batch_x=batch_x,
+                    batch_x_mark=batch_x_mark,
+                    batch_y_mark=batch_y_mark,
+                    pred_len=pred_len,
+                    prefix_calendar=prefix_calendar,
+                    prefix_social=prefix_social
+                )
+
+                true_y = batch_y[:, -pred_len:, :]
+
+                pred_y = pred_y.detach().cpu().numpy()   # [B, pred_len, 1]
+                true_y = true_y.detach().cpu().numpy()   # [B, pred_len, 1]
+
+                # 假设 meta 是 DataLoader collate 后的 dict-of-lists
+                sid_list = meta["sid_idx"]
+                station_list = meta["station_name"]
+                forecast_start_list = meta["forecast_start_time"]
+
+                B = pred_y.shape[0]
+
+                for b in range(B):
+                    sid_idx = int(sid_list[b])
+                    station_name = str(station_list[b])
+                    forecast_start_time = pd.Timestamp(forecast_start_list[b])
+
+                    for h in range(pred_len):
+                        target_time = forecast_start_time + pd.Timedelta(minutes=freq_minutes * h)
+
+                        yhat = float(pred_y[b, h, 0])
+                        ytrue = float(true_y[b, h, 0])
+
+                        # 尽量只保留训练 XGBoost 真正需要的列
+                        buffer_rows.append({
+                            "split": split,
+                            "sid_idx": sid_idx,
+                            "station_name": station_name,
+                            "forecast_start_time": forecast_start_time,
+                            "target_time": target_time,
+                            "horizon": h + 1,
+                            "y_true": ytrue,
+                            "y_hat_T": yhat,
+                            "residual": ytrue - yhat,
+                        })
+
+                # 到达 chunk_size 就立刻写一个 parquet part
+                if len(buffer_rows) >= chunk_size:
+                    flushed = flush_buffer_to_parquet(buffer_rows, part_idx)
+                    total_rows += flushed
+                    part_idx += 1
+                    buffer_rows.clear()
+
+                if (i + 1) % 100 == 0:
+                    print(f"[EXPORT] processed {i + 1}/{len(data_loader)} batches")
+
+                # 显式释放一部分中间变量
+                del pred_y, true_y
+                gc.collect()
+
+        # 最后剩余的再写一次
+        if len(buffer_rows) > 0:
+            flushed = flush_buffer_to_parquet(buffer_rows, part_idx)
+            total_rows += flushed
+            part_idx += 1
+            buffer_rows.clear()
+
+        # 额外保存一个简单的 meta 文件，便于后续检查
+        meta_info = pd.DataFrame([{
+            "setting": setting,
+            "split": split,
+            "ckpt_path": ckpt_path,
+            "pred_len": pred_len,
+            "freq_minutes": freq_minutes,
+            "num_parts": part_idx,
+            "total_rows": total_rows,
+        }])
+        meta_info.to_parquet(
+            os.path.join(out_dir, "_meta.parquet"),
+            index=False,
+            engine="pyarrow",
+            compression="snappy"
+        )
+
+        print(f"[EXPORT DONE] total_rows={total_rows}")
+        print(f"[EXPORT DONE] num_parts={part_idx}")
+        print(f"[EXPORT DONE] saved dir: {out_dir}")
+
+        return out_dir
+        
+    def _parse_batch(self, batch):
+        """
+        统一解析 dataloader 返回的 batch
+        支持：
+        - 4项: x, y, x_mark, y_mark
+        - 5项: x, y, x_mark, y_mark, prefix_calendar
+        - 6项: x, y, x_mark, y_mark, prefix_calendar, prefix_social
+        - 7项: x, y, x_mark, y_mark, prefix_calendar, prefix_social, meta
+        """
+        meta = None
+
+        if len(batch) == 7:
+            batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta = batch
+        elif len(batch) == 6:
+            batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social = batch
+        elif len(batch) == 5:
+            batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar = batch
+            prefix_social = None
+        elif len(batch) == 4:
+            batch_x, batch_y, batch_x_mark, batch_y_mark = batch
+            prefix_calendar = None
+            prefix_social = None
+        else:
+            raise ValueError(f"Unexpected batch length: {len(batch)}")
+
+        return batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta
+    def export_all_predictions(self, setting, test=0, save_dir="./xgb_exports", chunk_size=100000):
+        """
+        用同一个模型/ckpt，连续导出 train / val / test 三个 split。
+        """
+        results = {}
+        for split in ["train", "val", "test"]:
+            print(f"\n[EXPORT ALL] start split = {split}")
+            out_dir = self.export_predictions(
+                setting=setting,
+                split=split,
+                test=test,
+                save_dir=save_dir,
+                chunk_size=chunk_size
+            )
+            results[split] = out_dir
+            print(f"[EXPORT ALL] done split = {split}, saved to {out_dir}")
+        return results

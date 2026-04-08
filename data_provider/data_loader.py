@@ -77,6 +77,7 @@ class Dataset_MultiStation_Custom(Dataset):
         use_prefix=False,
         use_social_prefix=False,
         social_csv_path=None,
+        return_meta=False
     ):
 
         assert size is not None, "size must be provided"
@@ -89,6 +90,8 @@ class Dataset_MultiStation_Custom(Dataset):
         self.seq_len, self.label_len, self.pred_len = size
         self.use_social_prefix = use_social_prefix
         self.social_csv_path = social_csv_path
+
+        self.return_meta = bool(return_meta)
         if token_len is None:
             self.token_len = self.seq_len - self.label_len
         else:
@@ -518,8 +521,24 @@ class Dataset_MultiStation_Custom(Dataset):
 
         if prefix_social is None:
             prefix_social = torch.zeros(6, dtype=torch.float32)
+        meta = {
+                "sid_idx": sid_idx,
+                "station_name": self.stations[sid_idx],
+                "s_begin": s_begin,
+                "s_end": s_end,
+                "r_begin": r_begin,
+                "r_end": r_end,
+                "forecast_start_time": str(self.dt[s_end]),
+            }
+        if self.return_meta:
+            return seq_x, seq_y, seq_x_mark, seq_y_mark, prefix_calendar, prefix_social, meta
+        else:
+            return seq_x, seq_y, seq_x_mark, seq_y_mark, prefix_calendar, prefix_social
 
-        return seq_x, seq_y, seq_x_mark, seq_y_mark, prefix_calendar, prefix_social
+    def get_time_by_index(self, idx):
+        return self.dt[idx]
+    def get_series_slice(self, sid_idx, start, end):
+        return self.Y[sid_idx, start:end, 0]
 
     def _build_calendar_prefix(self, ts):
         """
