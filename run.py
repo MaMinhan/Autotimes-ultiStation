@@ -176,6 +176,10 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                         help='prediction parquet 保存目录')
     parser.add_argument('--export_chunk_size', type=int, default=100000,
                         help='export parquet 分块写盘大小，避免OOM')
+    parser.add_argument('--export_xgb_ready', action='store_true', default=False,
+                    help='直接导出适合XGBoost训练的 parquet 数据')
+    parser.add_argument('--export_all_xgb_ready', action='store_true', default=False,
+                        help='一次性导出 train/val/test 三个 split 的 XGBoost-ready parquet')
         
     args = parser.parse_args()
     if args.train_pred_len is None:
@@ -270,7 +274,21 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                     save_dir=args.export_save_dir,
                     chunk_size=args.export_chunk_size
                 )
-
+            if getattr(args, "export_all_xgb_ready", False):
+                exp.export_all_xgb_ready_datasets(
+                    setting=setting,
+                    test=0 if args.is_training else 1,
+                    save_dir=args.export_save_dir,
+                    chunk_size=args.export_chunk_size
+                )
+            elif getattr(args, "export_xgb_ready", False):
+                exp.export_xgb_ready_dataset(
+                    setting=setting,
+                    split=args.export_split,
+                    test=0 if args.is_training else 1,
+                    save_dir=args.export_save_dir,
+                    chunk_size=args.export_chunk_size
+                )
             torch.cuda.empty_cache()
 
     # ========== 6) 只测试模式：不训练，直接加载指定checkpoint测试 ==========
@@ -320,5 +338,19 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                 save_dir=args.export_save_dir,
                 chunk_size=args.export_chunk_size
             )
-
+        if getattr(args, "export_all_xgb_ready", False):
+            exp.export_all_xgb_ready_datasets(
+                setting=setting,
+                test=0 if args.is_training else 1,
+                save_dir=args.export_save_dir,
+                chunk_size=args.export_chunk_size
+            )
+        elif getattr(args, "export_xgb_ready", False):
+            exp.export_xgb_ready_dataset(
+                setting=setting,
+                split=args.export_split,
+                test=0 if args.is_training else 1,
+                save_dir=args.export_save_dir,
+                chunk_size=args.export_chunk_size
+            )
         torch.cuda.empty_cache()

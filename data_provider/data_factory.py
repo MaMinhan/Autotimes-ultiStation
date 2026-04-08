@@ -34,6 +34,13 @@ def data_provider(args, flag):
         else:
             pred_len = args.train_pred_len
 
+        need_meta = (
+            getattr(args, "export_predictions", False)
+            or getattr(args, "export_all_splits", False)
+            or getattr(args, "export_xgb_ready", False)
+            or getattr(args, "export_all_xgb_ready", False)
+        )
+
         dataset = Dataset_MultiStation_Custom(
             root_path=args.root_path,
             flag=flag,
@@ -55,10 +62,7 @@ def data_provider(args, flag):
             social_csv_path=getattr(args, "social_csv_path", None),
             use_prefix=getattr(args, "use_prefix", False),
             holiday_csv_path=getattr(args, "holiday_csv_path", None),
-            return_meta=(
-                getattr(args, "export_predictions", False)
-                or getattr(args, "export_all_splits", False)
-            )
+            return_meta=need_meta,
         )
 
         sampler = None

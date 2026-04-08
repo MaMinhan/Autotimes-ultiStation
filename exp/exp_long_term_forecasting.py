@@ -339,7 +339,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 train_loader.sampler.set_epoch(epoch + 1)
         df = pd.DataFrame(epoch_logs)   
         file_path = "./train_vali_test_loss_per_epoch_2.csv"
-        df.to_csv(file_path,mode="a",   header=not os.path.exists(file_path)),  # 只有第一次写header index=False)
+        df.to_csv(file_path,mode="a",   header=not os.path.exists(file_path))  # 只有第一次写header index=False)
         writer.close()
         best_model_path = path + '/' + 'checkpoint.pth'
         if self.args.use_multi_gpu:
@@ -725,7 +725,254 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         print(f"[EXPORT DONE] saved dir: {out_dir}")
 
         return out_dir
-        
+    def export_xgb_ready_dataset(
+        self,
+        setting,
+        split="train",
+        test=0,
+        save_dir="./xgb_ready_exports",
+        chunk_size=100000
+    ):
+        """
+        直接导出适合 XGBoost 训练的 parquet part 文件。
+        每行就是一个 horizon 样本，已经包含：
+        - AutoTimes 输出: y_hat_T
+        - 标签: label = y_true - y_hat_T
+        - lag / rolling / calendar 特征
+        - 基础索引: sid_idx, horizon, target_time
+
+        输出目录:
+        save_dir/{setting}_{split}_xgb_ready/
+            part_00000.parquet
+            part_00001.parquet
+            ...
+            _meta.parquet
+        """
+        import os
+        import gc
+        import shutil
+        import numpy as np
+        import pandas as pd
+        import torch
+
+        assert split in ["train", "val", "test"], f"split must be train/val/test, got {split}"
+
+        data_set, data_loader = self._get_data(flag=split)
+
+        # 加载 checkpoint
+        if test:
+            print("loading model for xgb-ready export...")
+            ckpt_setting = self.args.test_dir
+            best_model_path = self.args.test_file_name
+            ckpt_path = os.path.join(self.args.checkpoints, ckpt_setting, best_model_path)
+            print("loading model from {}".format(ckpt_path))
+            load_item = torch.load(ckpt_path, map_location="cpu")
+            self.model.load_state_dict({k.replace('module.', ''): v for k, v in load_item.items()}, strict=False)
+            setting = ckpt_setting
+        else:
+            ckpt_path = os.path.join(self.args.checkpoints, setting, "checkpoint.pth")
+            if os.path.exists(ckpt_path):
+                print("loading model from {}".format(ckpt_path))
+                load_item = torch.load(ckpt_path, map_location="cpu")
+                self.model.load_state_dict({k.replace('module.', ''): v for k, v in load_item.items()}, strict=False)
+            else:
+                print("[WARN] checkpoint not found, export will use current in-memory model:", ckpt_path)
+
+        if split == "test":
+            pred_len = self.args.test_pred_len
+        else:
+            pred_len = getattr(self.args, "train_pred_len", self.args.token_len)
+
+        print(f"[XGB-READY EXPORT] split={split}, pred_len={pred_len}")
+        print(f"[XGB-READY EXPORT] ckpt_path={ckpt_path}")
+
+        self.model.eval()
+        os.makedirs(save_dir, exist_ok=True)
+
+        out_dir = os.path.join(save_dir, f"{setting}_{split}_xgb_ready")
+        if os.path.exists(out_dir):
+            shutil.rmtree(out_dir)
+        os.makedirs(out_dir, exist_ok=True)
+
+        freq_minutes = getattr(self.args, "freq_minutes", 15)
+
+        buffer_rows = []
+        total_rows = 0
+        part_idx = 0
+
+        def _calendar_feats(ts: pd.Timestamp):
+            return {
+                "hour": int(ts.hour),
+                "minute": int(ts.minute),
+                "day_of_week": int(ts.dayofweek),
+                "month": int(ts.month),
+                "day": int(ts.day),
+                "is_weekend": int(ts.dayofweek >= 5),
+            }
+
+        def _safe_lag_and_roll(y_hist: np.ndarray, end_idx_exclusive: int):
+            """
+            y_hist: 某个站点全量历史序列, shape [T]
+            end_idx_exclusive: 当前 target_time 在全局 dt 中的位置 idx，
+                            所有 lag / rolling 都只能用 [:idx] 的历史
+            """
+            def lag(k):
+                idx = end_idx_exclusive - k
+                if idx < 0:
+                    return np.nan
+                return float(y_hist[idx])
+
+            def roll_mean(win):
+                l = end_idx_exclusive - win
+                r = end_idx_exclusive
+                if l < 0:
+                    return np.nan
+                arr = y_hist[l:r]
+                if arr.size == 0:
+                    return np.nan
+                return float(np.mean(arr))
+
+            def roll_std(win):
+                l = end_idx_exclusive - win
+                r = end_idx_exclusive
+                if l < 0:
+                    return np.nan
+                arr = y_hist[l:r]
+                if arr.size == 0:
+                    return np.nan
+                return float(np.std(arr))
+
+            return {
+                "lag_1": lag(1),
+                "lag_4": lag(4),
+                "lag_96": lag(96),
+                "lag_672": lag(672),
+                "rolling_mean_4": roll_mean(4),
+                "rolling_std_4": roll_std(4),
+                "rolling_mean_96": roll_mean(96),
+                "rolling_std_96": roll_std(96),
+            }
+
+        def flush_buffer(rows_buffer, current_part_idx):
+            if len(rows_buffer) == 0:
+                return 0
+            chunk_df = pd.DataFrame(rows_buffer)
+            save_path = os.path.join(out_dir, f"part_{current_part_idx:05d}.parquet")
+            chunk_df.to_parquet(save_path, index=False, engine="pyarrow", compression="snappy")
+            flushed = len(chunk_df)
+            print(f"[XGB-READY EXPORT] flushed {flushed} rows -> {save_path}")
+            del chunk_df
+            gc.collect()
+            return flushed
+
+        with torch.no_grad():
+            for i, batch in enumerate(data_loader):
+                batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta = self._parse_batch(batch)
+
+                if meta is None:
+                    raise ValueError("meta is None. export_xgb_ready_dataset requires return_meta=True")
+
+                batch_x = batch_x.float().to(self.device)
+                batch_y = batch_y.float().to(self.device)
+                batch_x_mark = batch_x_mark.float().to(self.device)
+                batch_y_mark = batch_y_mark.float().to(self.device)
+
+                if prefix_calendar is not None:
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                if prefix_social is not None:
+                    prefix_social = prefix_social.float().to(self.device)
+
+                pred_y = self._rollout_predict(
+                    batch_x=batch_x,
+                    batch_x_mark=batch_x_mark,
+                    batch_y_mark=batch_y_mark,
+                    pred_len=pred_len,
+                    prefix_calendar=prefix_calendar,
+                    prefix_social=prefix_social
+                )
+
+                true_y = batch_y[:, -pred_len:, :]
+
+                pred_y = pred_y.detach().cpu().numpy()   # [B, pred_len, 1]
+                true_y = true_y.detach().cpu().numpy()   # [B, pred_len, 1]
+
+                sid_list = meta["sid_idx"]
+                s_end_list = meta["s_end"]
+                station_list = meta["station_name"]
+
+                B = pred_y.shape[0]
+
+                for b in range(B):
+                    sid_idx = int(sid_list[b])
+                    s_end = int(s_end_list[b])
+                    station_name = str(station_list[b])
+
+                    # 全量历史序列（已经按全局 dt 对齐）
+                    y_hist = data_set.Y[sid_idx, :, 0]
+
+                    for h in range(pred_len):
+                        # target_time 对应全局 dt 索引
+                        target_idx = s_end + h
+                        if target_idx >= len(data_set.dt):
+                            continue
+
+                        target_time = pd.Timestamp(data_set.dt[target_idx])
+
+                        row = {
+                            "split": split,
+                            "sid_idx": sid_idx,
+                            "station_name": station_name,
+                            "target_time": target_time,
+                            "horizon": h + 1,
+                            "y_true": float(true_y[b, h, 0]),
+                            "y_hat_T": float(pred_y[b, h, 0]),
+                            "label": float(true_y[b, h, 0] - pred_y[b, h, 0]),
+                        }
+
+                        row.update(_calendar_feats(target_time))
+                        row.update(_safe_lag_and_roll(y_hist, target_idx))
+
+                        buffer_rows.append(row)
+
+                if len(buffer_rows) >= chunk_size:
+                    flushed = flush_buffer(buffer_rows, part_idx)
+                    total_rows += flushed
+                    part_idx += 1
+                    buffer_rows.clear()
+
+                if (i + 1) % 100 == 0:
+                    print(f"[XGB-READY EXPORT] processed {i + 1}/{len(data_loader)} batches")
+
+                del pred_y, true_y
+                gc.collect()
+
+        if len(buffer_rows) > 0:
+            flushed = flush_buffer(buffer_rows, part_idx)
+            total_rows += flushed
+            part_idx += 1
+            buffer_rows.clear()
+
+        meta_info = pd.DataFrame([{
+            "setting": setting,
+            "split": split,
+            "ckpt_path": ckpt_path,
+            "pred_len": pred_len,
+            "freq_minutes": freq_minutes,
+            "num_parts": part_idx,
+            "total_rows": total_rows,
+        }])
+        meta_info.to_parquet(
+            os.path.join(out_dir, "_meta.parquet"),
+            index=False,
+            engine="pyarrow",
+            compression="snappy"
+        )
+
+        print(f"[XGB-READY EXPORT DONE] total_rows={total_rows}")
+        print(f"[XGB-READY EXPORT DONE] num_parts={part_idx}")
+        print(f"[XGB-READY EXPORT DONE] saved dir: {out_dir}")
+
+        return out_dir
     def _parse_batch(self, batch):
         """
         统一解析 dataloader 返回的 batch
@@ -768,4 +1015,18 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             )
             results[split] = out_dir
             print(f"[EXPORT ALL] done split = {split}, saved to {out_dir}")
+        return results
+    def export_all_xgb_ready_datasets(self, setting, test=0, save_dir="./xgb_ready_exports", chunk_size=100000):
+        results = {}
+        for split in ["train", "val", "test"]:
+            print(f"\n[XGB-READY EXPORT ALL] start split = {split}")
+            out_dir = self.export_xgb_ready_dataset(
+                setting=setting,
+                split=split,
+                test=test,
+                save_dir=save_dir,
+                chunk_size=chunk_size
+            )
+            results[split] = out_dir
+            print(f"[XGB-READY EXPORT ALL] done split = {split}, saved to {out_dir}")
         return results
