@@ -78,29 +78,59 @@ def describe_trend(start_temp: float, end_temp: float, threshold: float = 0.5) -
         return "stable"
 
 
+def describe_temperature_level(mean_temp: float) -> str:
+    if mean_temp < 10:
+        return "cold"
+    elif mean_temp < 18:
+        return "cool"
+    elif mean_temp < 26:
+        return "mild"
+    elif mean_temp < 32:
+        return "warm"
+    else:
+        return "very hot"
+
+
+def describe_temperature_variability(min_temp: float, max_temp: float) -> str:
+    span = max_temp - min_temp
+    if span < 3:
+        return "with little temperature change"
+    elif span < 8:
+        return "with moderate temperature change"
+    else:
+        return "with large temperature change"
+
+
+def describe_trend(start_temp: float, end_temp: float, threshold: float = 0.8) -> str:
+    diff = end_temp - start_temp
+    if diff > threshold:
+        return "getting hotter"
+    elif diff < -threshold:
+        return "getting cooler"
+    else:
+        return "remaining stable"
+
+
 def build_temp_window_text(
     temps_window: np.ndarray,
     start_time: pd.Timestamp,
     end_time: pd.Timestamp
 ) -> str:
-    """
-    为一个 token_len 时间窗口构造天气文本。
-    语义上表达的是：
-    这段 series 对应时间窗口内的辅助温度信息。
-    """
     start_temp = float(temps_window[0])
     end_temp = float(temps_window[-1])
     mean_temp = float(np.mean(temps_window))
     min_temp = float(np.min(temps_window))
     max_temp = float(np.max(temps_window))
-    trend = describe_trend(start_temp, end_temp)
+
+    level_desc = describe_temperature_level(mean_temp)
+    trend_desc = describe_trend(start_temp, end_temp)
+    var_desc = describe_temperature_variability(min_temp, max_temp)
 
     return (
         f"This is the series from {start_time:%Y-%m-%d %H:%M:%S} "
         f"to {end_time:%Y-%m-%d %H:%M:%S}. "
-        f"The temperature has an average of {mean_temp:.1f} degrees Celsius. "
+        f"The weather is {level_desc}, {trend_desc}, {var_desc}. "
     )
-
 
 
 def main():

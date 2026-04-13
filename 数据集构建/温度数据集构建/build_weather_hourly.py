@@ -10,7 +10,7 @@ from tqdm import tqdm
 # =========================
 STATIONS_FILE = "/root/autodl-tmp/datasets/SelfMadeAusgridData/stations_to_SA2_SA3_SA4_2021.csv"
 STATION_MAP_FILE = "/root/autodl-tmp/datasets/SelfMadeAusgridData/station_map.csv"
-OUTPUT_FILE = "/root/autodl-tmp/datasets/SelfMadeAusgridData/weather_hourly_20210501_20240430.csv"
+OUTPUT_FILE = "/root/autodl-tmp/datasets/SelfMadeAusgridData/weather_hourly_20210501_20240430_test.csv"
 
 START_DATE = "2021-05-01"
 END_DATE = "2024-04-30"
