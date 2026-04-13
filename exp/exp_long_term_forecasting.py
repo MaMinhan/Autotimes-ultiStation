@@ -735,18 +735,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
     ):
         """
         直接导出适合 XGBoost 训练的 parquet part 文件。
-        每行就是一个 horizon 样本，已经包含：
+        每行就是一个 horizon 样本，包含：
         - AutoTimes 输出: y_hat_T
         - 标签: label = y_true - y_hat_T
         - lag / rolling / calendar 特征
-        - 基础索引: sid_idx, horizon, target_time
+        - 基础索引: sid_idx, horizon
 
-        输出目录:
-        save_dir/{setting}_{split}_xgb_ready/
-            part_00000.parquet
-            part_00001.parquet
-            ...
-            _meta.parquet
+        重要：
+        - 所有 lag / rolling 只使用 forecast origin (= s_end) 之前的历史
+        - 不允许使用 target_idx 对应时刻之前的真实值，否则会泄露未来信息
         """
         import os
         import gc
@@ -794,8 +791,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             shutil.rmtree(out_dir)
         os.makedirs(out_dir, exist_ok=True)
 
-        freq_minutes = getattr(self.args, "freq_minutes", 15)
-
         buffer_rows = []
         total_rows = 0
         part_idx = 0
@@ -810,21 +805,21 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 "is_weekend": int(ts.dayofweek >= 5),
             }
 
-        def _safe_lag_and_roll(y_hist: np.ndarray, end_idx_exclusive: int):
+        def _safe_lag_and_roll(y_hist: np.ndarray, origin_idx: int):
             """
             y_hist: 某个站点全量历史序列, shape [T]
-            end_idx_exclusive: 当前 target_time 在全局 dt 中的位置 idx，
-                            所有 lag / rolling 都只能用 [:idx] 的历史
+            origin_idx: forecast origin 在全局 dt 中的位置
+                        所有 lag / rolling 都只能使用 [:origin_idx] 的历史
             """
             def lag(k):
-                idx = end_idx_exclusive - k
+                idx = origin_idx - k
                 if idx < 0:
                     return np.nan
                 return float(y_hist[idx])
 
             def roll_mean(win):
-                l = end_idx_exclusive - win
-                r = end_idx_exclusive
+                l = origin_idx - win
+                r = origin_idx
                 if l < 0:
                     return np.nan
                 arr = y_hist[l:r]
@@ -833,8 +828,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 return float(np.mean(arr))
 
             def roll_std(win):
-                l = end_idx_exclusive - win
-                r = end_idx_exclusive
+                l = origin_idx - win
+                r = origin_idx
                 if l < 0:
                     return np.nan
                 arr = y_hist[l:r]
@@ -898,20 +893,23 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                 sid_list = meta["sid_idx"]
                 s_end_list = meta["s_end"]
-                station_list = meta["station_name"]
 
                 B = pred_y.shape[0]
 
                 for b in range(B):
                     sid_idx = int(sid_list[b])
                     s_end = int(s_end_list[b])
-                    station_name = str(station_list[b])
+
+                    # forecast origin：所有特征只能基于这个时间点之前的历史
+                    origin_idx = s_end
 
                     # 全量历史序列（已经按全局 dt 对齐）
                     y_hist = data_set.Y[sid_idx, :, 0]
 
+                    # 同一个 forecast origin 下，lag / rolling 固定不变
+                    hist_feats = _safe_lag_and_roll(y_hist, origin_idx)
+
                     for h in range(pred_len):
-                        # target_time 对应全局 dt 索引
                         target_idx = s_end + h
                         if target_idx >= len(data_set.dt):
                             continue
@@ -919,10 +917,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         target_time = pd.Timestamp(data_set.dt[target_idx])
 
                         row = {
-                            "split": split,
                             "sid_idx": sid_idx,
-                            "station_name": station_name,
-                            "target_time": target_time,
                             "horizon": h + 1,
                             "y_true": float(true_y[b, h, 0]),
                             "y_hat_T": float(pred_y[b, h, 0]),
@@ -930,7 +925,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         }
 
                         row.update(_calendar_feats(target_time))
-                        row.update(_safe_lag_and_roll(y_hist, target_idx))
+                        row.update(hist_feats)
 
                         buffer_rows.append(row)
 
@@ -957,7 +952,6 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             "split": split,
             "ckpt_path": ckpt_path,
             "pred_len": pred_len,
-            "freq_minutes": freq_minutes,
             "num_parts": part_idx,
             "total_rows": total_rows,
         }])

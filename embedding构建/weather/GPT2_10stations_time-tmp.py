@@ -5,48 +5,46 @@ from typing import List
 import numpy as np
 import pandas as pd
 import torch
-import holidays
-from transformers import LlamaTokenizer, LlamaForCausalLM
+from transformers import AutoTokenizer
+from transformers.models.gpt2.modeling_gpt2 import GPT2Model
 
 
 @torch.no_grad()
-def embed_texts_llama_original(
+def embed_texts(
     texts: List[str],
     tokenizer,
     model,
     device,
     batch_size: int = 64,
-    max_length: int = 192,
+    max_length: int = 192
 ) -> torch.Tensor:
-    """
-    严格对齐原始 Preprocess_Llama.py 的风格：
-    1) 不手动补 EOS
-    2) tokenizer 得到 input_ids
-    3) 用 get_input_embeddings() 转成 input embeddings
-    4) 调用 llama.model(inputs_embeds=...)
-    5) 取最后一个位置 [:, -1, :]
-    """
     model.eval()
     embs = []
 
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
 
+        # 显式加 EOS
+        batch = [t + " " + tokenizer.eos_token for t in batch]
+
         enc = tokenizer(
             batch,
-            return_tensors="pt",
             padding=True,
             truncation=True,
             max_length=max_length,
-            add_special_tokens=True,
+            return_tensors="pt",
+            add_special_tokens=False,
         )
-        input_ids = enc["input_ids"].to(device)
+        enc = {k: v.to(device) for k, v in enc.items()}
 
-        inputs_embeds = model.get_input_embeddings()(input_ids)
-        text_outputs = model.model(inputs_embeds=inputs_embeds)[0]
-        batch_embs = text_outputs[:, -1, :]
+        out = model(**enc)
+        last_hidden = out.last_hidden_state  # [B, L, D]
 
-        embs.append(batch_embs.detach().cpu())
+        eos_idx = enc["attention_mask"].sum(dim=1) - 1
+        batch_idx = torch.arange(last_hidden.size(0), device=device)
+        e = last_hidden[batch_idx, eos_idx, :]  # [B, D]
+
+        embs.append(e.detach().cpu())
 
     return torch.cat(embs, dim=0)
 
@@ -54,7 +52,7 @@ def embed_texts_llama_original(
 def clean_hourly_temperature_series(
     s: pd.Series,
     min_valid_temp: float = -20.0,
-    max_valid_temp: float = 60.0,
+    max_valid_temp: float = 60.0
 ) -> pd.Series:
     s = s.astype(float).copy()
     s[~np.isfinite(s)] = np.nan
@@ -80,36 +78,29 @@ def describe_trend(start_temp: float, end_temp: float, threshold: float = 0.5) -
         return "stable"
 
 
-def build_holiday_text(start_time: pd.Timestamp, holiday_calendar) -> str:
-    day = pd.Timestamp(start_time).date()
-    is_holiday = day in holiday_calendar
-    holiday_name = holiday_calendar.get(day, "")
-    if is_holiday:
-        return f"It is a public holiday ({holiday_name})."
-    return "It is not a public holiday."
-
-
-def build_temp_holiday_window_text(
+def build_temp_window_text(
     temps_window: np.ndarray,
     start_time: pd.Timestamp,
-    end_time: pd.Timestamp,
-    holiday_calendar,
+    end_time: pd.Timestamp
 ) -> str:
+    """
+    为一个 token_len 时间窗口构造天气文本。
+    语义上表达的是：
+    这段 series 对应时间窗口内的辅助温度信息。
+    """
     start_temp = float(temps_window[0])
     end_temp = float(temps_window[-1])
     mean_temp = float(np.mean(temps_window))
     min_temp = float(np.min(temps_window))
     max_temp = float(np.max(temps_window))
     trend = describe_trend(start_temp, end_temp)
-    holiday_text = build_holiday_text(start_time, holiday_calendar)
 
     return (
-        f"{holiday_text} "
-        f"This is the series from {start_time:%Y-%m-%d %H:%M:%S} to {end_time:%Y-%m-%d %H:%M:%S}. "
-        f"The temperature has an average of {mean_temp:.1f} degrees Celsius, "
-        f"a minimum of {min_temp:.1f} degrees Celsius, and a maximum of {max_temp:.1f} degrees Celsius. "
-        f"The overall temperature trend is {trend}."
+        f"This is the series from {start_time:%Y-%m-%d %H:%M:%S} "
+        f"to {end_time:%Y-%m-%d %H:%M:%S}. "
+        f"The temperature has an average of {mean_temp:.1f} degrees Celsius. "
     )
+
 
 
 def main():
@@ -120,10 +111,11 @@ def main():
     ap.add_argument("--weather_csv", type=str, required=True,
                     help="Hourly weather CSV, must include date, station_id, temperature_2m_mean")
     ap.add_argument("--llm_ckp_dir", type=str, required=True,
-                    help="HF model dir, e.g. /root/autodl-tmp/llama")
+                    help="HF model dir, e.g. /root/autodl-tmp/hf_models/gpt2")
     ap.add_argument("--out_weather_pt", type=str, required=True,
                     help="Output weather.pt path, shape [N, T, D]")
 
+    # 新增：token_len
     ap.add_argument("--token_len", type=int, required=True,
                     help="Token length used by the forecasting model")
 
@@ -132,7 +124,7 @@ def main():
     ap.add_argument("--days_limit", type=int, default=0,
                     help="For debugging: only keep first N days per station after alignment. 0 = all")
 
-    ap.add_argument("--batch_size", type=int, default=16)
+    ap.add_argument("--batch_size", type=int, default=64)
     ap.add_argument("--max_length", type=int, default=192)
     ap.add_argument("--device", type=str, default="cuda")
     ap.add_argument("--dtype", type=str, default="float16", choices=["float16", "float32"])
@@ -140,16 +132,11 @@ def main():
     ap.add_argument("--min_valid_temp", type=float, default=-20.0)
     ap.add_argument("--max_valid_temp", type=float, default=60.0)
 
-    ap.add_argument("--holiday_country", type=str, default="AU")
-    ap.add_argument("--holiday_subdiv", type=str, default="NSW")
-
     args = ap.parse_args()
 
-    holiday_calendar = holidays.country_holidays(
-        args.holiday_country,
-        subdiv=args.holiday_subdiv,
-    )
-
+    # ------------------------------------------------------------
+    # 1) Read power csv -> global 15min time axis + station list
+    # ------------------------------------------------------------
     print("[1/5] Reading power csv...")
     dfp = pd.read_csv(args.power_csv, usecols=["datetime", "station_id"])
     dfp["datetime"] = pd.to_datetime(dfp["datetime"], errors="coerce")
@@ -169,8 +156,10 @@ def main():
     print(f"[POWER] N={N}, T={T}")
     print(f"[POWER] dt range: {dt.iloc[0]} -> {dt.iloc[-1]}")
     print(f"[CONFIG] token_len={args.token_len}")
-    print(f"[CONFIG] holiday_country={args.holiday_country}, holiday_subdiv={args.holiday_subdiv}")
 
+    # ------------------------------------------------------------
+    # 2) Read weather csv (hourly), only use temperature_2m_mean
+    # ------------------------------------------------------------
     print("[2/5] Reading weather csv...")
     dfw = pd.read_csv(
         args.weather_csv,
@@ -182,36 +171,36 @@ def main():
     dfw["station_id"] = dfw["station_id"].astype(int)
     dfw["temperature_2m_mean"] = pd.to_numeric(dfw["temperature_2m_mean"], errors="coerce")
 
+    # 同一站点同一时刻若有重复，取均值
     dfw = dfw.groupby(["station_id", "date"], as_index=False).mean(numeric_only=True)
+
+    # 只保留 power 里存在的 station
     dfw = dfw[dfw["station_id"].isin(station_ids)].copy()
 
     print(f"[WEATHER] rows(after groupby/filter)={len(dfw)}")
     print(f"[WEATHER] station count={dfw['station_id'].nunique()}")
 
+    # ------------------------------------------------------------
+    # 3) Load embedding model
+    # ------------------------------------------------------------
     print("[3/5] Loading tokenizer/model...")
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
-    tokenizer = LlamaTokenizer.from_pretrained(args.llm_ckp_dir)
+    tokenizer = AutoTokenizer.from_pretrained(args.llm_ckp_dir)
+    if tokenizer.eos_token is None:
+        raise ValueError("GPT2 tokenizer has no eos_token, please check llm_ckp_dir.")
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = LlamaForCausalLM.from_pretrained(
-        args.llm_ckp_dir,
-        torch_dtype=torch.float16 if args.dtype == "float16" else torch.float32,
-        device_map=None,
-    ).to(device)
-
-    for p in model.parameters():
-        p.requires_grad = False
-    model.eval()
+    model = GPT2Model.from_pretrained(args.llm_ckp_dir).to(device)
 
     D = model.config.hidden_size
     out_dtype = torch.float16 if args.dtype == "float16" else torch.float32
 
     weather_pt = torch.zeros((N, T, D), dtype=out_dtype)
 
-    missing_text = "Temperature or holiday data is unavailable for this station and time window."
-    missing_emb = embed_texts_llama_original(
+    missing_text = "Temperature data is unavailable for this station and time window."
+    missing_emb = embed_texts(
         texts=[missing_text],
         tokenizer=tokenizer,
         model=model,
@@ -224,6 +213,11 @@ def main():
     print(f"[EMBED] hidden_size={D}, dtype={out_dtype}")
     print(f"[ALLOC] weather_pt shape={tuple(weather_pt.shape)}")
 
+    # ------------------------------------------------------------
+    # 4) For each station:
+    #    clean hourly -> 15min interpolate -> align to global dt
+    #    -> token-window text -> embedding
+    # ------------------------------------------------------------
     print("[4/5] Generating token-window embeddings...")
 
     dt_index = pd.DatetimeIndex(dt)
@@ -240,6 +234,7 @@ def main():
 
         g = g.sort_values("date")
         g = g.set_index("date")
+
         s = g["temperature_2m_mean"]
 
         raw_zero_cnt = int((s == 0).sum())
@@ -248,7 +243,7 @@ def main():
         s_hourly = clean_hourly_temperature_series(
             s,
             min_valid_temp=args.min_valid_temp,
-            max_valid_temp=args.max_valid_temp,
+            max_valid_temp=args.max_valid_temp
         )
         cleaned_nan_cnt = int(s_hourly.isna().sum())
 
@@ -257,6 +252,7 @@ def main():
         s_aligned = s_15.reindex(dt_index)
         s_aligned = s_aligned.interpolate(method="time").ffill().bfill()
 
+        # debug only: keep first N days
         if args.days_limit > 0:
             keep_dates = global_dates.drop_duplicates().iloc[:args.days_limit]
             keep_mask = global_dates.isin(set(keep_dates))
@@ -264,6 +260,7 @@ def main():
         else:
             valid_tidx = np.arange(T)
 
+        # 只对能形成完整 token window 的起点生成文本
         candidate_tidx = [t for t in valid_tidx if t + args.token_len <= T]
 
         if len(candidate_tidx) == 0:
@@ -277,29 +274,30 @@ def main():
             start_time = dt.iloc[t]
             end_time = dt.iloc[t + args.token_len - 1]
 
-            text = build_temp_holiday_window_text(
+            text = build_temp_window_text(
                 temps_window=temps_window,
                 start_time=start_time,
-                end_time=end_time,
-                holiday_calendar=holiday_calendar,
+                end_time=end_time
             )
             texts.append(text)
 
-        embs = embed_texts_llama_original(
+        embs = embed_texts(
             texts=texts,
             tokenizer=tokenizer,
             model=model,
             device=device,
             batch_size=args.batch_size,
             max_length=args.max_length,
-        )
+        )  # [len(candidate_tidx), D]
 
         embs = embs.half() if out_dtype == torch.float16 else embs.float()
 
+        # 先全部填 missing，再覆盖有效位置
         weather_pt[sid_idx, :, :] = missing_emb.unsqueeze(0).repeat(T, 1)
         for k, t in enumerate(candidate_tidx):
             weather_pt[sid_idx, t, :] = embs[k]
 
+        # 对最后不足一个 token_len 的尾巴，保留 missing_emb
         print(
             f"[STATION] sid={sid}, valid_windows={len(candidate_tidx)}, "
             f"raw_zero_cnt={raw_zero_cnt}, raw_nan_cnt={raw_nan_cnt}, "
@@ -308,6 +306,9 @@ def main():
             f"temp_min={float(s_aligned.min()):.3f}, temp_max={float(s_aligned.max()):.3f}"
         )
 
+    # ------------------------------------------------------------
+    # 5) Save
+    # ------------------------------------------------------------
     print("[5/5] Saving...")
     out_dir = os.path.dirname(args.out_weather_pt)
     if out_dir:
@@ -328,16 +329,13 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-'''python /root/autotimes/embedding构建/weather/Llama_make_weather_holiday_timstamp_pt.py \
-  --power_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/load_10stations_20240101_20240430.csv \
+'''python /root/autotimes/embedding构建/weather/GPT2_weather_time_0406.py \
+  --power_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/electricity/merged_include_id_filled.csv \
   --weather_csv /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/weather_hourly_20210501_20240430.csv \
-  --llm_ckp_dir /root/autodl-tmp/hf_models/llama \
-  --out_weather_pt /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/weather_holiday_token96_llama.pt \
+  --llm_ckp_dir /root/autodl-tmp/hf_models/gpt2 \
+  --out_weather_pt /root/autodl-tmp/datasets/SelfMadeAusgridData/weather/0406_time+temp_token96_gpt2.pt \
   --token_len 96 \
-  --batch_size 8 \
+  --batch_size 64 \
   --max_length 192 \
   --device cuda \
-  --dtype float16 \
-  --holiday_country AU \
-  --holiday_subdiv NSW'''
+  --dtype float16'''
