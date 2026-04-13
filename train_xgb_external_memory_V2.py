@@ -477,10 +477,10 @@ if __name__ == "__main__":
 
 '''
 python train_xgb_external_memory_V2.py \
-  --train_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/with_exog/train \
-  --val_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/with_exog/val \
-  --test_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/with_exog/test \
-  --out_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/with_exog/output \
+  --train_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/no_exog/train_predictions \
+  --val_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/no_exog/val_predictions \
+  --test_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/no_exog/test_predictions \
+  --out_dir /root/autodl-tmp/xgb_exports/CKPT_From_multi_scale_time-pt_no_prefix/no_exog/output \
   --clear_cache \
   --num_boost_round 250 \
   --verbose_eval 50 
