@@ -1024,3 +1024,188 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             results[split] = out_dir
             print(f"[XGB-READY EXPORT ALL] done split = {split}, saved to {out_dir}")
         return results
+    def test_with_xgb(self, setting, xgb_model_path, test=0):
+        """
+        用 AutoTimes + XGBoost residual correction 按原始 dataloader/test 口径评估。
+        口径与原始 test() 一致：
+        - 直接在 dataloader 的 batch 上 rollout
+        - 不导出 parquet
+        - 不 merge raw csv
+        - 不 dedup
+        - 最后统一 metric(preds, trues)
+
+        XGBoost 预测的是 residual:
+            residual_hat = f(features)
+        最终预测:
+            pred_final = y_hat_T + residual_hat
+        """
+        import xgboost as xgb
+        import pandas as pd
+        import numpy as np
+        import torch
+        from utils.metrics import metric
+
+        test_data, test_loader = self._get_data(flag='test')
+
+        print("info:", self.args.test_seq_len, self.args.test_label_len, self.args.token_len, self.args.test_pred_len)
+
+        # ========= 1) 加载 AutoTimes checkpoint =========
+        if test:
+            print('loading model')
+            ckpt_setting = self.args.test_dir
+            best_model_path = self.args.test_file_name
+            ckpt_path = os.path.join(self.args.checkpoints, ckpt_setting, best_model_path)
+
+            print("loading model from {}".format(ckpt_path))
+            load_item = torch.load(ckpt_path, map_location="cpu")
+            self.model.load_state_dict({k.replace('module.', ''): v for k, v in load_item.items()}, strict=False)
+
+            setting = ckpt_setting
+        else:
+            ckpt_path = os.path.join(self.args.checkpoints, setting, 'checkpoint.pth')
+            if os.path.exists(ckpt_path):
+                print("loading model from {}".format(ckpt_path))
+                load_item = torch.load(ckpt_path, map_location="cpu")
+                self.model.load_state_dict({k.replace('module.', ''): v for k, v in load_item.items()}, strict=False)
+            else:
+                print("[WARN] checkpoint not found, will use current in-memory model:", ckpt_path)
+
+        # ========= 2) 加载 XGBoost =========
+        booster = xgb.Booster()
+        booster.load_model(xgb_model_path)
+        print("[XGB] loaded model from", xgb_model_path)
+
+        preds_base = []
+        preds_final = []
+        trues = []
+
+        folder_path = './test_results_xgb/' + setting + '/'
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
+        time_now = time.time()
+        test_steps = len(test_loader)
+        iter_count = 0
+
+        self.model.eval()
+
+        with torch.no_grad():
+            for i, batch in enumerate(test_loader):
+                batch_x, batch_y, batch_x_mark, batch_y_mark, prefix_calendar, prefix_social, meta = self._parse_batch(batch)
+
+                if prefix_calendar is not None:
+                    prefix_calendar = prefix_calendar.float().to(self.device)
+                if prefix_social is not None:
+                    prefix_social = prefix_social.float().to(self.device)
+
+                iter_count += 1
+
+                batch_x = batch_x.float().to(self.device)
+                batch_y = batch_y.float().to(self.device)
+                batch_x_mark = batch_x_mark.float().to(self.device)
+                batch_y_mark = batch_y_mark.float().to(self.device)
+
+                # ========= 3) AutoTimes rollout =========
+                pred_y = self._rollout_predict(
+                    batch_x=batch_x,
+                    batch_x_mark=batch_x_mark,
+                    batch_y_mark=batch_y_mark,
+                    pred_len=self.args.test_pred_len,
+                    prefix_calendar=prefix_calendar,
+                    prefix_social=prefix_social
+                )  # [B, H, 1]
+
+                true_y = batch_y[:, -self.args.test_pred_len:, :]  # [B, H, 1]
+
+                pred_y_np = pred_y.detach().cpu().numpy()
+                true_y_np = true_y.detach().cpu().numpy()
+
+                # ========= 4) 构造 XGBoost 输入 =========
+                # 当前最基础版本只用:
+                # sid_idx, horizon, y_hat_T
+                if meta is None:
+                    raise ValueError("meta is None. test_with_xgb requires meta with sid_idx.")
+
+                sid_list = meta["sid_idx"]
+
+                B, H, C = pred_y_np.shape
+                assert C == 1, f"Expected last dim = 1, got {C}"
+
+                rows = []
+                for b in range(B):
+                    sid_idx = int(sid_list[b])
+                    for h in range(H):
+                        rows.append({
+                            "sid_idx": sid_idx,
+                            "horizon": h + 1,
+                            "y_hat_T": float(pred_y_np[b, h, 0]),
+                        })
+
+                X_df = pd.DataFrame(rows)
+
+                # ========= 5) XGBoost 预测 residual，并做修正 =========
+                pred_residual = booster.predict(xgb.DMatrix(X_df))   # [B*H]
+                pred_residual = pred_residual.reshape(B, H, 1)
+
+                pred_final_np = pred_y_np + pred_residual
+
+                preds_base.append(pred_y_np)
+                preds_final.append(pred_final_np)
+                trues.append(true_y_np)
+
+                if (i + 1) % 100 == 0:
+                    speed = (time.time() - time_now) / iter_count
+                    left_time = speed * (test_steps - i)
+                    print("\titers: {}, speed: {:.4f}s/iter, left time: {:.4f}s".format(i + 1, speed, left_time))
+                    iter_count = 0
+                    time_now = time.time()
+
+        # ========= 6) 仿照原始 test()：统一拼接，统一计算 metric =========
+        preds_base = np.concatenate(preds_base, axis=0)
+        preds_final = np.concatenate(preds_final, axis=0)
+        trues = np.concatenate(trues, axis=0)
+
+        mae_base, mse_base, rmse_base, mape_base, mspe_base = metric(preds_base, trues)
+        mae_final, mse_final, rmse_final, mape_final, mspe_final = metric(preds_final, trues)
+
+        print('[BASE] mse:{}, mae:{}'.format(mse_base, mae_base))
+        print('[XGB ] mse:{}, mae:{}'.format(mse_final, mae_final))
+
+        # ========= 7) 写结果 =========
+        with open("result_long_term_forecast_xgb.txt", "a", encoding="utf-8") as f:
+            f.write("=" * 120 + "\n")
+            f.write(f"setting: {setting}\n")
+            f.write(f"ckpt_path: {ckpt_path}\n")
+            f.write(f"xgb_model_path: {xgb_model_path}\n")
+            f.write(f"time_pt_path: {getattr(self.args, 'time_pt_path', '')}\n")
+            f.write(f"weather_pt_path: {getattr(self.args, 'weather_pt_path', '')}\n")
+            f.write(
+                f"seq_len: {self.args.seq_len}, "
+                f"label_len: {self.args.label_len}, "
+                f"token_len: {self.args.token_len}, "
+                f"test_pred_len: {self.args.test_pred_len}\n"
+            )
+            f.write(
+                f"[BASE] mse: {mse_base}, mae: {mae_base}, rmse: {rmse_base}, mape: {mape_base}, mspe: {mspe_base}\n"
+            )
+            f.write(
+                f"[XGB ] mse: {mse_final}, mae: {mae_final}, rmse: {rmse_final}, mape: {mape_final}, mspe: {mspe_final}\n"
+            )
+            f.write("\n")
+
+        return {
+            "base": {
+                "mse": float(mse_base),
+                "mae": float(mae_base),
+                "rmse": float(rmse_base),
+                "mape": float(mape_base),
+                "mspe": float(mspe_base),
+            },
+            "xgb": {
+                "mse": float(mse_final),
+                "mae": float(mae_final),
+                "rmse": float(rmse_final),
+                "mape": float(mape_final),
+                "mspe": float(mspe_final),
+            }
+        }

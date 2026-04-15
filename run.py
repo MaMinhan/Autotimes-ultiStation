@@ -180,7 +180,7 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                     help='直接导出适合XGBoost训练的 parquet 数据')
     parser.add_argument('--export_all_xgb_ready', action='store_true', default=False,
                         help='一次性导出 train/val/test 三个 split 的 XGBoost-ready parquet')
-        
+    parser.add_argument('--xgb_model_path', type=str, default='', help='XGBoost residual model path')
     args = parser.parse_args()
     if args.train_pred_len is None:
         args.train_pred_len = args.token_len
@@ -320,7 +320,11 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
         exp = Exp(args)
 
         # 只测试模式：先常规 test
-        exp.test(setting, test=1)
+        exp = Exp(args)
+        #exp.test(setting, test=1)
+
+        if args.xgb_model_path:
+            exp.test_with_xgb(setting, xgb_model_path=args.xgb_model_path, test=1)
 
         # 如需导出 prediction，再继续导出
         if getattr(args, "export_all_splits", False):
