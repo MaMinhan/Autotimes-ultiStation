@@ -180,7 +180,12 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                     help='直接导出适合XGBoost训练的 parquet 数据')
     parser.add_argument('--export_all_xgb_ready', action='store_true', default=False,
                         help='一次性导出 train/val/test 三个 split 的 XGBoost-ready parquet')
-        
+    parser.add_argument(
+        '--ms_components',
+        type=str,
+        default='fine,pattern,rr',
+        help='多尺度分支组合，可选: fine / fine,pattern / fine,rr / fine,pattern,rr'
+    )
     args = parser.parse_args()
     if args.train_pred_len is None:
         args.train_pred_len = args.token_len
@@ -224,7 +229,7 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
             exp = Exp(args)         # 构造实验对象：里面会 build model / build dataloader 等
 
             # setting：实验唯一标识字符串（用于 checkpoint 子目录命名 + 日志标识）
-            setting = '{}_{}_{}_{}_sl{}_ll{}_tl{}_tpl{}_lr{}_bt{}_wd{}_hd{}_hl{}_cos{}_mix{}_{}_ep{}_mark_input_dim{}_itr{}'.format(
+            setting = '{}_{}_{}_{}_sl{}_ll{}_tl{}_lr{}_bt{}_wd{}_hd{}_hl{}_cos{}_mix{}_ms{}_mf{}_{}_{}'.format(
                 args.task_name,
                 args.model_id,
                 args.model,
@@ -232,7 +237,6 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                 args.seq_len,
                 args.label_len,
                 args.token_len,
-                args.test_pred_len,
                 args.learning_rate,
                 args.batch_size,
                 args.weight_decay,
@@ -240,13 +244,11 @@ if __name__ == '__main__':  # 脚本入口（只有直接运行 run.py 才执行
                 args.mlp_hidden_layers,
                 args.cosine,
                 args.mix_embeds,
+                args.ms_components,
+                args.ms_fusion,
                 args.des,
-                args.ms_scale,
-                args.train_epochs,
-                args.mark_input_dim,
                 ii
             )
-
             # 只有主进程打印，避免多卡刷屏；单卡直接打印
             if (args.use_multi_gpu and args.local_rank == 0) or not args.use_multi_gpu:
                 print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
